@@ -1,30 +1,51 @@
 const { startServer } = require('./http-server');
+const { Scheduler } = require('./scheduler');
+const { ObservationStore } = require('./observation-store');
+const { DEFAULT_TASKS, TltStateMachine } = require('./automation-core');
 const config = require('../config');
 
-console.log('='.repeat(50));
-console.log('  Discord TLT Auto Bot');
-console.log('='.repeat(50));
-console.log(`  Channel ID: ${config.discord.channelId}`);
-console.log(`  Command:    ${config.monitor.command}`);
-console.log(`  Port:       ${config.server.port}`);
-console.log(`  Retry:      ${config.monitor.maxRetries} lần, delay ${config.monitor.retryDelay}ms`);
-console.log('='.repeat(50));
+const observations = new ObservationStore();
+const tlt = new TltStateMachine({
+  command: config.monitor.command,
+  buttonLabels: config.monitor.buttonLabels,
+  responseTimeoutMs: config.monitor.responseTimeoutMs
+});
+const scheduler = new Scheduler({
+  onError: message => observations.append({ type: 'scheduler_error', message })
+});
 
-// Kiểm tra cấu hình
-if (!config.discord.token) {
-  console.error('❌ Lỗi: DISCORD_TOKEN chưa được đặt trong .env');
-  process.exit(1);
+for (const [id, task] of Object.entries(DEFAULT_TASKS)) {
+  scheduler.add({
+    id,
+    intervalMs: task.intervalMs,
+    enabled: config.monitor.tasks[id] !== false,
+    run: async () => {
+      observations.append({ type: 'scheduled_task', taskId: id, command: task.command, mode: 'simulation' });
+      console.log(`[Scheduler] ${id}: ${task.command}`);
+    }
+  });
 }
-if (!config.discord.channelId) {
-  console.error('❌ Lỗi: CHANNEL_ID chưa được đặt trong .env');
-  process.exit(1);
-}
 
-// Khởi động server HTTP
-startServer();
+scheduler.add({
+  id: 'tlt',
+  intervalMs: config.monitor.tltIntervalMs,
+  enabled: config.monitor.tasks.tlt !== false,
+  run: async () => {
+    const result = tlt.begin();
+    observations.append({ type: 'tlt_cycle', result });
+    console.log(`[TLT] ${result.ok ? result.action.command : result.reason}`);
+  }
+});
 
-// Nhấn Ctrl+C để dừng
+console.log('Kana automation core ready (transport-neutral mode).');
+console.log('Tasks:', scheduler.status());
+startServer({ scheduler, tlt, observations });
+scheduler.start();
+
 process.on('SIGINT', () => {
-  console.log('\n🛑 Đang tắt...');
+  scheduler.stop();
+  console.log('\n🛑 Đã dừng scheduler.');
   process.exit(0);
 });
+
+module.exports = { scheduler, tlt, observations };
