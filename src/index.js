@@ -1,51 +1,22 @@
-const { startServer } = require('./http-server');
-const { Scheduler } = require('./scheduler');
-const { ObservationStore } = require('./observation-store');
-const { DEFAULT_TASKS, TltStateMachine } = require('./automation-core');
+require('dotenv').config();
+const { scheduler } = require('./automation-core');
 const config = require('../config');
 
-const observations = new ObservationStore();
-const tlt = new TltStateMachine({
-  command: config.monitor.command,
-  buttonLabels: config.monitor.buttonLabels,
-  responseTimeoutMs: config.monitor.responseTimeoutMs
-});
-const scheduler = new Scheduler({
-  onError: message => observations.append({ type: 'scheduler_error', message })
-});
+console.log('='.repeat(50));
+console.log('  Kana Self Bot — Scheduler');
+console.log('='.repeat(50));
+console.log(`  Channel ID: ${config.discord.channelId}`);
+console.log(`  Tasks đã đăng ký: ${scheduler.tasks.size}`);
+console.log('='.repeat(50));
 
-for (const [id, task] of Object.entries(DEFAULT_TASKS)) {
-  scheduler.add({
-    id,
-    intervalMs: task.intervalMs,
-    enabled: config.monitor.tasks[id] !== false,
-    run: async () => {
-      observations.append({ type: 'scheduled_task', taskId: id, command: task.command, mode: 'simulation' });
-      console.log(`[Scheduler] ${id}: ${task.command}`);
-    }
-  });
-}
+// Bắt đầu tất cả task
+scheduler.startAll();
 
-scheduler.add({
-  id: 'tlt',
-  intervalMs: config.monitor.tltIntervalMs,
-  enabled: config.monitor.tasks.tlt !== false,
-  run: async () => {
-    const result = tlt.begin();
-    observations.append({ type: 'tlt_cycle', result });
-    console.log(`[TLT] ${result.ok ? result.action.command : result.reason}`);
-  }
-});
-
-console.log('Kana automation core ready (transport-neutral mode).');
-console.log('Tasks:', scheduler.status());
-startServer({ scheduler, tlt, observations });
-scheduler.start();
+console.log('\n✅ Scheduler đã khởi động — đang gửi tin nhắn...');
+console.log('Nhấn Ctrl+C để dừng\n');
 
 process.on('SIGINT', () => {
-  scheduler.stop();
-  console.log('\n🛑 Đã dừng scheduler.');
+  console.log('\n🛑 Đang dừng...');
+  scheduler.stopAll();
   process.exit(0);
 });
-
-module.exports = { scheduler, tlt, observations };
