@@ -1,46 +1,44 @@
 const express = require('express');
-const { start: monitorStart, stop: monitorStop, status: monitorStatus } = require('./monitor');
 const config = require('../config');
 
 const app = express();
 app.use(express.json());
 
-// Trang chủ - kiểm tra trạng thái
+let runtime = null;
+
 app.get('/', (req, res) => {
-  res.json({
-    service: 'Discord TLT Controller',
-    status: 'online',
-    monitor: monitorStatus(),
-    endpoints: {
-      GET: ['/', '/status'],
-      POST: ['/start', '/stop']
-    }
-  });
+  res.json({ service: 'Kana Automation Core', status: 'online', endpoints: ['GET /status', 'POST /start', 'POST /stop', 'POST /tasks/:id'] });
 });
 
-// Lấy trạng thái
 app.get('/status', (req, res) => {
-  res.json(monitorStatus());
+  if (!runtime) return res.status(503).json({ error: 'runtime not initialized' });
+  res.json({ tasks: runtime.scheduler.status(), tlt: runtime.tlt.status() });
 });
 
-// Bắt đầu
 app.post('/start', (req, res) => {
-  const result = monitorStart();
-  res.json(result);
+  if (!runtime) return res.status(503).json({ error: 'runtime not initialized' });
+  runtime.scheduler.start();
+  res.json({ ok: true, tasks: runtime.scheduler.status() });
 });
 
-// Dừng
 app.post('/stop', (req, res) => {
-  const result = monitorStop();
-  res.json(result);
+  if (!runtime) return res.status(503).json({ error: 'runtime not initialized' });
+  runtime.scheduler.stop();
+  res.json({ ok: true });
 });
 
-function startServer() {
+app.post('/tasks/:id', (req, res) => {
+  if (!runtime) return res.status(503).json({ error: 'runtime not initialized' });
+  const enabled = Boolean(req.body?.enabled);
+  const ok = runtime.scheduler.setEnabled(req.params.id, enabled);
+  if (!ok) return res.status(404).json({ ok: false, error: 'unknown task' });
+  res.json({ ok: true, task: runtime.scheduler.status().find(task => task.id === req.params.id) });
+});
+
+function startServer(nextRuntime) {
+  runtime = nextRuntime;
   app.listen(config.server.port, () => {
-    console.log(`[HTTP Server] 🚀 Đang chạy tại http://localhost:${config.server.port}`);
-    console.log(`[HTTP Server]    GET  http://localhost:${config.server.port}/status`);
-    console.log(`[HTTP Server]   POST  http://localhost:${config.server.port}/start`);
-    console.log(`[HTTP Server]   POST  http://localhost:${config.server.port}/stop`);
+    console.log(`[HTTP Server] 🚀 http://localhost:${config.server.port}`);
   });
 }
 
