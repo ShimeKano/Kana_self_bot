@@ -1,66 +1,77 @@
+const { sendMessage } = require('./discord'); // ✅ Import hàm gửi tin nhắn
+
 const DEFAULT_TASKS = Object.freeze({
   tl: { intervalMs: 65_000, command: '.tl' },
   tranyeu: { intervalMs: 25_000, command: '.tranyeu' },
-  pvp: { intervalMs: 305_000, command: '.pvp' }
+  pvp: { intervalMs: 305_000, command: '.pvp' },
+  tlt: { intervalMs: 60_000, command: '.tlt' } // lệnh mới
 });
 
-class TltStateMachine {
-  constructor({ command = '.tlt', buttonLabels = ['Bắt Đầu', 'Tiếp Tục'], responseTimeoutMs = 20_000 } = {}) {
-    this.command = command;
-    this.buttonLabels = buttonLabels;
-    this.responseTimeoutMs = responseTimeoutMs;
-    this.state = 'IDLE';
-    this.lastCommandAt = null;
-    this.lastMessageId = null;
+class Scheduler {
+  constructor() {
+    this.tasks = new Map();
+    this.intervals = new Map();
+    this.observations = [];
   }
 
-  begin(now = Date.now()) {
-    if (this.state !== 'IDLE') return { ok: false, reason: 'busy', state: this.state };
-    this.state = 'WAITING_RESPONSE';
-    this.lastCommandAt = now;
-    this.lastMessageId = null;
-    return { ok: true, action: { type: 'SEND_COMMAND', command: this.command } };
+  add({ id, intervalMs, enabled = true, run }) {
+    this.tasks.set(id, { id, intervalMs, enabled, run });
   }
 
-  observe(message) {
-    if (this.state !== 'WAITING_RESPONSE' && this.state !== 'WAITING_BUTTON') return null;
-    if (!message?.id || (this.lastCommandAt && message.createdTimestamp && message.createdTimestamp < this.lastCommandAt)) return null;
+  startAll() {
+    for (const [id, task] of this.tasks) {
+      if (!task.enabled) continue;
+      this._startTask(task);
+    }
+  }
 
-    const buttons = (message.components || []).flatMap(row => row.components || [])
-      .filter(component => component.type === 2 || component.type === 'button')
-      .map(component => ({ id: component.custom_id, label: component.label }));
+  _startTask(task) {
+    // Chạy lần đầu ngay lập tức
+    task.run();
+    // Lặp lại theo chu kỳ
+    const timer = setInterval(() => task.run(), task.intervalMs);
+    this.intervals.set(task.id, timer);
+  }
 
-    const target = buttons.find(button => this.buttonLabels.some(label => button.label === label || button.label?.includes(label)));
-    if (!target) return null;
+  stopAll() {
+    for (const timer of this.intervals.values()) clearInterval(timer);
+    this.intervals.clear();
+  }
 
-    this.state = 'WAITING_BUTTON';
-    this.lastMessageId = message.id;
+  getStatus() {
     return {
-      type: 'BUTTON_REQUIRED',
-      messageId: message.id,
-      buttonId: target.id,
-      label: target.label
-    };
-  }
-
-  complete() {
-    this.state = 'IDLE';
-    return { ok: true, state: this.state };
-  }
-
-  timeout(now = Date.now()) {
-    if (this.state === 'IDLE' || !this.lastCommandAt) return false;
-    return now - this.lastCommandAt >= this.responseTimeoutMs;
-  }
-
-  status() {
-    return {
-      state: this.state,
-      lastCommandAt: this.lastCommandAt,
-      lastMessageId: this.lastMessageId,
-      responseTimeoutMs: this.responseTimeoutMs
+      running: this.intervals.size > 0,
+      activeTasks: this.intervals.size,
+      observations: [...this.observations]
     };
   }
 }
 
-module.exports = { DEFAULT_TASKS, TltStateMachine };
+const scheduler = new Scheduler();
+
+// Đăng ký tất cả task
+for (const [id, task] of Object.entries(DEFAULT_TASKS)) {
+  scheduler.add({
+    id,
+    intervalMs: task.intervalMs,
+    enabled: true, // sau này có thể đọc từ config
+    run: async () => {
+      console.log(`[Scheduler] Đang gửi: ${task.command}`);
+      const result = await sendMessage(task.command); // ✅ GỬI TIN NHẮN THẬT
+      scheduler.observations.push({
+        type: 'scheduled_task',
+        taskId: id,
+        command: task.command,
+        success: result.ok,
+        timestamp: new Date().toISOString()
+      });
+      if (!result.ok) {
+        console.error(`[Scheduler] Gửi ${task.command} thất bại: ${result.error}`);
+      } else {
+        console.log(`[Scheduler] ✅ Đã gửi: ${task.command}`);
+      }
+    }
+  });
+}
+
+module.exports = { scheduler, DEFAULT_TASKS };
