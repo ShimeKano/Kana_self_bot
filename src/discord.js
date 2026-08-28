@@ -1,6 +1,13 @@
 const axios = require('axios');
 const config = require('../config');
 
+if (!config.discord.token) {
+  throw new Error('DISCORD_TOKEN chưa được cấu hình trong .env');
+}
+if (!config.discord.channelId) {
+  throw new Error('CHANNEL_ID chưa được cấu hình trong .env');
+}
+
 const api = axios.create({
   baseURL: config.discord.apiBase,
   headers: {
@@ -14,26 +21,26 @@ const api = axios.create({
 async function sendMessage(content) {
   try {
     const res = await api.post(`/channels/${config.discord.channelId}/messages`, {
-      content, tts: false
+      content,
+      tts: false
     });
     return { ok: true, data: res.data };
   } catch (err) {
-    return handleError(err, 'gửi tin nhắn');
+    const status = err.response?.status;
+    const data = err.response?.data;
+    console.error(`[Discord API] Lỗi gửi tin nhắn: ${status}`, data);
+    return {
+      ok: false,
+      error: status === 401 ? 'TOKEN_INVALID'
+           : status === 429 ? 'RATE_LIMITED'
+           : 'NETWORK_ERROR',
+      status,
+      details: data
+    };
   }
 }
 
-// Lấy tin nhắn mới nhất trong channel
-async function fetchLatestMessages(limit = 5) {
-  try {
-    const res = await api.get(`/channels/${config.discord.channelId}/messages?limit=${limit}`);
-    return { ok: true, data: res.data };
-  } catch (err) {
-    return handleError(err, 'lấy tin nhắn');
-  }
-}
-
-// Nhấn nút (gửi interaction)
-async function clickButton(messageId, componentId) {
+module.exports = { sendMessage };
   try {
     const res = await api.post(`/interactions`, {
       type: 3, // MESSAGE_COMPONENT
