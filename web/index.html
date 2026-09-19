@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kana Control Panel</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #0b1020; color: #eef2ff; }
+    main { max-width: 1100px; margin: 0 auto; padding: 28px; }
+    h1 { margin-bottom: 6px; }
+    .muted { color: #94a3b8; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap: 16px; margin-top: 20px; }
+    .card { background:#11182b; border:1px solid #26314d; border-radius:16px; padding:18px; }
+    input, textarea, button { width:100%; box-sizing:border-box; border-radius:10px; border:1px solid #33415f; padding:10px 12px; margin:6px 0; background:#0b1222; color:#fff; }
+    button { cursor:pointer; background:#1d4ed8; border:0; }
+    button.danger { background:#991b1b; }
+    .row { display:flex; gap:8px; }
+    .row > * { flex:1; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#172554; margin:2px; font-size:12px; }
+    .account { border-top:1px solid #26314d; margin-top:14px; padding-top:14px; }
+    code { color:#93c5fd; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>🛠 Kana Control Panel</h1>
+  <div class="muted">Local-only dashboard. Tokens are masked in the UI and stored only in your local ignored data file.</div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Accounts / Tokens</h2>
+      <div id="accounts"></div>
+      <h3>Thêm token</h3>
+      <input id="accountId" placeholder="Account ID, ví dụ main-2">
+      <input id="accountName" placeholder="Tên hiển thị">
+      <input id="accountToken" type="password" placeholder="Token">
+      <button onclick="addAccount()">+ Thêm token</button>
+    </section>
+
+    <section class="card">
+      <h2>Message</h2>
+      <input id="defaultMessage" placeholder="Tin nhắn mặc định">
+      <textarea id="messages" rows="10" placeholder='{"tlt": ".tlt"}'></textarea>
+      <button onclick="saveMessages()">Lưu message config</button>
+      <p class="muted">Muốn đổi message sau này chỉ sửa ở đây, không cần sửa logic scheduler.</p>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>Channels</h2>
+    <div id="channels"></div>
+    <div class="row">
+      <input id="channelAccountId" placeholder="Account ID">
+      <input id="channelId" placeholder="Channel ID">
+      <input id="channelName" placeholder="Tên channel">
+      <button onclick="addChannel()">+ Thêm channel</button>
+    </div>
+  </section>
+</main>
+<script>
+async function api(url, options) {
+  const r = await fetch(url, { headers: {'Content-Type':'application/json'}, ...options });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
+
+function render(data) {
+  document.getElementById('accounts').innerHTML = data.accounts.map(a => `
+    <div class="account">
+      <strong>${esc(a.name)}</strong>
+      <span class="pill">${a.id === data.activeAccountId ? 'ACTIVE' : 'INACTIVE'}</span>
+      <div class="muted">ID: <code>${esc(a.id)}</code></div>
+      <div>Token: <code>${esc(a.tokenPreview || 'not configured')}</code></div>
+      <button onclick="activateAccount('${esc(a.id)}')">Chọn account</button>
+      <button class="danger" onclick="removeAccount('${esc(a.id)}')">Xóa account</button>
+    </div>`).join('') || '<p class="muted">Chưa có account.</p>';
+
+  document.getElementById('channels').innerHTML = data.accounts.flatMap(a =>
+    (a.channels || []).map(c => `
+      <div class="account">
+        <strong>${esc(a.name)}</strong> → <code>${esc(c.id)}</code>
+        <span class="pill">${esc(c.name)}</span>
+        <button class="danger" onclick="removeChannel('${esc(a.id)}','${esc(c.id)}')">Xóa channel</button>
+      </div>`)).join('') || '<p class="muted">Chưa có channel.</p>';
+
+  document.getElementById('defaultMessage').value = data.messages.defaultMessage || '';
+  document.getElementById('messages').value = JSON.stringify(data.messages.messages || {}, null, 2);
+}
+
+async function load() { render(await api('/api/config')); }
+
+async function addAccount() {
+  try {
+    await api('/api/accounts', {method:'POST', body:JSON.stringify({
+      id: document.getElementById('accountId').value.trim(),
+      name: document.getElementById('accountName').value.trim(),
+      token: document.getElementById('accountToken').value
+    })});
+    document.getElementById('accountToken').value = '';
+    await load();
+  } catch(e) { alert(e.message); }
+}
+
+async function removeAccount(id) {
+  if (!confirm('Xóa account này?')) return;
+  try { await api('/api/accounts/'+encodeURIComponent(id), {method:'DELETE'}); await load(); }
+  catch(e) { alert(e.message); }
+}
+
+async function activateAccount(id) {
+  try { await api('/api/active-account', {method:'POST', body:JSON.stringify({accountId:id})}); await load(); }
+  catch(e) { alert(e.message); }
+}
+
+async function addChannel() {
+  try {
+    const accountId = document.getElementById('channelAccountId').value.trim();
+    await api('/api/accounts/'+encodeURIComponent(accountId)+'/channels', {
+      method:'POST',
+      body:JSON.stringify({
+        channelId: document.getElementById('channelId').value.trim(),
+        name: document.getElementById('channelName').value.trim()
+      })
+    });
+    await load();
+  } catch(e) { alert(e.message); }
+}
+
+async function removeChannel(accountId, channelId) {
+  if (!confirm('Xóa channel này?')) return;
+  try {
+    await api('/api/accounts/'+encodeURIComponent(accountId)+'/channels/'+encodeURIComponent(channelId), {method:'DELETE'});
+    await load();
+  } catch(e) { alert(e.message); }
+}
+
+async function saveMessages() {
+  try {
+    const messages = JSON.parse(document.getElementById('messages').value || '{}');
+    await api('/api/messages', {method:'PUT', body:JSON.stringify({
+      defaultMessage: document.getElementById('defaultMessage').value,
+      messages
+    })});
+    alert('Đã lưu message config.');
+  } catch(e) { alert(e.message); }
+}
+
+load().catch(e => alert(e.message));
+</script>
+</body>
+</html>
