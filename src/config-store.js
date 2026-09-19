@@ -182,5 +182,5 @@ module.exports = {
   DATA_DIR, ACCOUNTS_FILE, MESSAGES_FILE, ensureDataFiles,
   loadAccounts, saveAccounts, updateAccount, setAccountTokenStatus,
   disableAccount, enableAccount, loadMessages, saveMessages,
-  getPublicAccounts, getActiveTarget
+  getPublicAccounts, failoverFromAccount, getActiveTarget
 };
