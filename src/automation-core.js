@@ -1,138 +1,59 @@
 const { sendMessage } = require('./discord');
 const { getActiveTarget, loadMessages } = require('./config-store');
-const config = require('../config');
-
-const DEFAULT_TASKS = Object.freeze({
-  tl: { id: 'tl', command: '.tl', intervalMs: 65_000, description: 'Lệnh TL - mỗi 65 giây' },
-  tranyeu: { id: 'tranyeu', command: '.tranyeu', intervalMs: 25_000, description: 'Lệnh Trà Nước - mỗi 25 giây' },
-  pvp: { id: 'pvp', command: '.pvp', intervalMs: 305_000, description: 'Lệnh PvP - mỗi 5 phút 5 giây' },
-  tlt: { id: 'tlt', command: '.tlt', intervalMs: 60_000, description: 'Lệnh TLT - mỗi 1 phút' }
-});
+const { aiListener } = require('./ai/ai-listener');
 
 class Scheduler {
-  constructor() {
-    this.tasks = new Map();
-    this.intervals = new Map();
-    this.observations = [];
-    this.startTime = null;
-  }
+  constructor() { this.intervals = new Map(); this.observations = []; this.startTime = null; }
 
-  add(taskConfig) {
-    if (!taskConfig?.id) throw new Error('Task phải có id');
-    if (!Number.isFinite(taskConfig.intervalMs)) throw new Error(`Task ${taskConfig.id} phải có intervalMs hợp lệ`);
-    this.tasks.set(taskConfig.id, { enabled: true, lastRunAt: null, runCount: 0, failCount: 0, ...taskConfig });
-  }
-
-  enable(id) { const task = this.tasks.get(id); if (!task) return false; task.enabled = true; return true; }
-  disable(id) { const task = this.tasks.get(id); if (!task) return false; task.enabled = false; return true; }
-
-  resolveMessage(task) {
-    const messages = loadMessages();
-    return messages.messages?.[task.id] ?? task.command ?? messages.defaultMessage;
-  }
-
-  async runTask(taskId) {
-    const task = this.tasks.get(taskId);
-    if (!task) return { ok: false, error: 'TASK_NOT_FOUND' };
-    if (!task.enabled) return { ok: false, error: 'TASK_DISABLED' };
-
-    const target = getActiveTarget();
-    const command = this.resolveMessage(task);
-    if (!target) {
-      task.failCount++;
-      return { ok: false, error: 'NO_ACTIVE_TARGET', message: 'Chưa có account/channel hợp lệ' };
-    }
-
+  async runMessage(message) {
+    if (aiListener.enabled || !message?.enabled) return;
+    const target = getActiveTarget(); if (!target || !message.text?.trim()) return;
     try {
-      const result = await sendMessage(command, target);
-      task.lastRunAt = new Date();
-      task.runCount++;
-      if (!result?.ok) task.failCount++;
-
-      this.observations.push({
-        type: 'scheduled_task',
-        taskId,
-        command,
-        accountId: target.accountId,
-        channelId: target.channelId,
-        timestamp: new Date().toISOString(),
-        success: Boolean(result?.ok),
-        error: result?.error || null,
-        message: result?.message || null,
-        messageId: result?.messageId || null
-      });
-
+      const result = await sendMessage(message.text.trim(), target);
+      this.observations.push({ type:'custom_message', messageId:message.id, text:message.text, accountId:target.accountId, channelId:target.channelId, timestamp:new Date().toISOString(), success:Boolean(result?.ok), error:result?.error || null });
       if (this.observations.length > 500) this.observations.splice(0, this.observations.length - 500);
-      return result;
     } catch (error) {
-      task.lastRunAt = new Date();
-      task.runCount++;
-      task.failCount++;
-      return { ok: false, error: 'TASK_EXCEPTION', message: error.message };
+      this.observations.push({type:'custom_message',messageId:message.id,text:message.text,timestamp:new Date().toISOString(),success:false,error:error.message});
+    }
+  }
+
+  stopCustomTimers() {
+    for (const timer of this.intervals.values()) clearInterval(timer);
+    this.intervals.clear();
+  }
+
+  sync() {
+    if (aiListener.enabled) { this.stopCustomTimers(); return; }
+    const desired = new Map(loadMessages().messages.map(m => [m.id, m]));
+    for (const [id, timer] of this.intervals) {
+      if (!desired.has(id) || !desired.get(id).enabled) { clearInterval(timer); this.intervals.delete(id); }
+    }
+    for (const message of desired.values()) {
+      if (!message.enabled || this.intervals.has(message.id)) continue;
+      this.runMessage(message);
+      this.intervals.set(message.id, setInterval(() => this.runMessage(message), message.intervalSeconds * 1000));
     }
   }
 
   startAll() {
     if (this.startTime) return;
-    this.startTime = new Date();
-
-    for (const [taskId, task] of this.tasks) {
-      if (!task.enabled) continue;
-      this.runTask(taskId).catch(console.error);
-      this.intervals.set(taskId, setInterval(() => {
-        if (task.enabled) this.runTask(taskId).catch(console.error);
-      }, task.intervalMs));
-    }
+    this.startTime = new Date(); this.sync();
+    this.configTimer = setInterval(() => this.sync(), 2000);
   }
-
   start() { this.startAll(); }
-
   stopAll() {
-    for (const intervalId of this.intervals.values()) clearInterval(intervalId);
-    this.intervals.clear();
-    this.startTime = null;
+    this.stopCustomTimers();
+    if (this.configTimer) clearInterval(this.configTimer);
+    this.configTimer = null; this.startTime = null;
   }
-
   stop() { this.stopAll(); }
-
-  setEnabled(id, enabled) { return enabled ? this.enable(id) : this.disable(id); }
-
   getStatus() {
-    const now = Date.now();
-    const tasks = [...this.tasks].map(([id, task]) => {
-      const lastRunMs = task.lastRunAt?.getTime() ?? null;
-      const nextRunInMs = this.intervals.has(id) && lastRunMs !== null
-        ? Math.max(0, task.intervalMs - (now - lastRunMs)) : null;
-      return {
-        id, command: this.resolveMessage(task), description: task.description || null,
-        intervalMs: task.intervalMs, intervalSeconds: task.intervalMs / 1000,
-        enabled: task.enabled, running: this.intervals.has(id),
-        runCount: task.runCount, failCount: task.failCount,
-        lastRunAt: task.lastRunAt?.toISOString() || null,
-        nextRunInMs,
-        nextRunInSeconds: nextRunInMs === null ? null : Math.ceil(nextRunInMs / 1000)
-      };
-    });
-
-    return {
-      running: this.intervals.size > 0,
-      startTime: this.startTime?.toISOString() || null,
-      activeTasks: this.intervals.size,
-      totalTasks: this.tasks.size,
-      tasks,
-      recentLogs: this.observations.slice(-20)
-    };
+    const messages = loadMessages().messages;
+    return { running:this.intervals.size > 0, startTime:this.startTime?.toISOString() || null, activeTasks:this.intervals.size, totalTasks:messages.length,
+      tasks:messages.map(m => ({id:m.id,text:m.text,intervalSeconds:m.intervalSeconds,enabled:m.enabled,running:this.intervals.has(m.id)})),
+      recentLogs:this.observations.slice(-20) };
   }
-
   status() { return this.getStatus(); }
 }
-
 const scheduler = new Scheduler();
-for (const [id, task] of Object.entries(DEFAULT_TASKS)) {
-  scheduler.add({
-    ...task,
-    enabled: (config.tasks || {})[id] !== false
-  });
-}
-
-module.exports = { Scheduler, scheduler, DEFAULT_TASKS };
+module.exports = { Scheduler, scheduler };

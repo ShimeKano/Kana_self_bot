@@ -11,7 +11,6 @@ function printStartupInfo() {
   const accounts = getPublicAccounts();
   console.log(`  Accounts: ${accounts.accounts.length}`);
   console.log(`  Active:   ${accounts.activeAccountId || 'none'}`);
-  console.log(`  Tasks:    ${scheduler.tasks.size}`);
   console.log('');
 }
 
@@ -19,8 +18,8 @@ try {
   ensureDataFiles();
   printStartupInfo();
   startDashboard();
-  scheduler.startAll();
   if (config.ai?.enabled) aiListener.start();
+  scheduler.startAll();
 
   console.log('✅ Scheduler đang chạy. Nhấn Ctrl+C để dừng.\n');
 
@@ -34,6 +33,7 @@ try {
   process.on('uncaughtException', (err) => {
     console.error('\n❌ LỖI:', err);
     scheduler.stopAll();
+    aiListener.stop();
     process.exit(1);
   });
 } catch (error) {
