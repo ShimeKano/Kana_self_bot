@@ -7,15 +7,14 @@ class Scheduler {
 
   async runMessage(message) {
     if (aiListener.enabled || !message?.enabled) return;
-    const target = getActiveTarget(); if (!target) return;
-    const texts = String(message.text || '').split(',').map(s => s.trim()).filter(Boolean);
-    if (!texts.length) return;
-    const text = texts[Math.floor(Math.random() * texts.length)];
+    const target = getActiveTarget(); if (!target || !message.text?.trim()) return;
     try {
-      const result = await sendMessage(text, target);
-      this.observations.push({ type:'custom_message', messageId:message.id, text, accountId:target.accountId, channelId:target.channelId, timestamp:new Date().toISOString(), success:Boolean(result?.ok), error:result?.error || null });
+      const result = await sendMessage(message.text.trim(), target);
+      this.observations.push({ type:'custom_message', messageId:message.id, text:message.text, accountId:target.accountId, channelId:target.channelId, timestamp:new Date().toISOString(), success:Boolean(result?.ok), error:result?.error || null });
       if (this.observations.length > 500) this.observations.splice(0, this.observations.length - 500);
-    } catch (error) { this.observations.push({type:'custom_message',messageId:message.id,text,timestamp:new Date().toISOString(),success:false,error:error.message}); }
+    } catch (error) {
+      this.observations.push({type:'custom_message',messageId:message.id,text:message.text,timestamp:new Date().toISOString(),success:false,error:error.message});
+    }
   }
 
   stopCustomTimers() {
