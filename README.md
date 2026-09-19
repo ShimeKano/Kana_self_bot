@@ -55,3 +55,17 @@ Never commit a real token. If a token has already been exposed publicly, revoke/
 ```bash
 npm test
 ```
+
+## Optional AI Reply
+
+AI Reply is a separate optional module. Custom Message/scheduled messages still work without Ollama.
+
+For setup and model installation, see [docs/AI_SETUP.md](docs/AI_SETUP.md).
+
+Quick model setup:
+```bash
+ollama pull qwen3:1.7b
+ollama serve
+```
+
+The dashboard lets you switch between **Custom Message** and **AI Reply**. AI Reply watches the currently selected channel and uses the local Ollama model to generate responses.

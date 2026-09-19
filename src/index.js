@@ -1,6 +1,8 @@
 const { scheduler } = require('./automation-core');
+const config = require('../config');
 const { ensureDataFiles, getPublicAccounts } = require('./config-store');
 const { startDashboard } = require('./dashboard');
+const { aiListener } = require('./ai/ai-listener');
 
 function printStartupInfo() {
   console.log('\n╔════════════════════════════════════════════════════════════╗');
@@ -18,12 +20,14 @@ try {
   printStartupInfo();
   startDashboard();
   scheduler.startAll();
+  if (config.ai?.enabled) aiListener.start();
 
   console.log('✅ Scheduler đang chạy. Nhấn Ctrl+C để dừng.\n');
 
   process.on('SIGINT', () => {
     console.log('\n🛑 Đang dừng...');
     scheduler.stopAll();
+    aiListener.stop();
     process.exit(0);
   });
 

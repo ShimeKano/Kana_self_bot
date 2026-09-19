@@ -87,6 +87,17 @@ async function fetchLatestMessages(limit = 10, target) {
   return fetchMessages(limit, target);
 }
 
+async function fetchCurrentUser(target) {
+  try {
+    const resolved = resolveTarget(target);
+    const api = createApi(resolved.token);
+    const response = await api.get('/users/@me');
+    return { ok: true, data: response.data };
+  } catch (error) {
+    return handleError(error, 'lấy thông tin account');
+  }
+}
+
 async function clickButton(messageId, componentId) {
   if (!messageId) return { ok: false, error: 'MESSAGE_ID_REQUIRED', message: 'Thiếu messageId' };
   if (!componentId) return { ok: false, error: 'COMPONENT_ID_REQUIRED', message: 'Thiếu componentId' };
@@ -97,4 +108,4 @@ async function clickButton(messageId, componentId) {
   };
 }
 
-module.exports = { sendMessage, fetchMessages, fetchLatestMessages, clickButton };
+module.exports = { sendMessage, fetchMessages, fetchLatestMessages, fetchCurrentUser, clickButton };

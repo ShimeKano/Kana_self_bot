@@ -8,6 +8,7 @@ const {
   getPublicAccounts
 } = require('./config-store');
 const config = require('../config');
+const { aiListener } = require('./ai/ai-listener');
 
 const app = express();
 app.use(express.json({ limit: '64kb' }));
@@ -19,7 +20,8 @@ app.get('/', (req, res) => {
 app.get('/api/config', (req, res) => {
   res.json({
     ...getPublicAccounts(),
-    messages: loadMessages()
+    messages: loadMessages(),
+    ai: aiListener.getStatus()
   });
 });
 
@@ -132,6 +134,12 @@ app.put('/api/messages', (req, res) => {
   });
 
   res.json({ ok: true, messages: loadMessages() });
+});
+
+app.post('/api/ai/toggle', (req, res) => {
+  const enabled = Boolean(req.body?.enabled);
+  aiListener.setEnabled(enabled);
+  res.json({ ok: true, ai: aiListener.getStatus() });
 });
 
 app.get('/api/health', (req, res) => {
