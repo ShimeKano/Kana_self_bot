@@ -1,0 +1,16 @@
+{
+  "activeAccountId": "main",
+  "accounts": [
+    {
+      "id": "main",
+      "name": "Main",
+      "token": "PUT_TOKEN_HERE",
+      "channels": [
+        {
+          "id": "PUT_CHANNEL_ID_HERE",
+          "name": "Main channel"
+        }
+      ]
+    }
+  ]
+}
