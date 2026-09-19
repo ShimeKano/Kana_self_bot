@@ -19,6 +19,11 @@ module.exports = {
   server: {
     port: parseInt(process.env.PORT || '3000', 10)
   },
+  ai: {
+    enabled: parseBoolean(process.env.AI_ENABLED ?? false),
+    ollamaUrl: process.env.OLLAMA_URL || 'http://127.0.0.1:11434',
+    ollamaModel: process.env.OLLAMA_MODEL || 'qwen3:1.7b'
+  },
   scheduler: {
     maxRetries: 5,
     retryDelayMs: 5000
