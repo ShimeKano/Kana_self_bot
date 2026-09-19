@@ -94,6 +94,19 @@ app.delete('/api/accounts/:id/channels/:channelId', (req, res) => {
   res.json({ ok: true, accounts: getPublicAccounts() });
 });
 
+app.post('/api/accounts/:id/active-channel', (req, res) => {
+  const { channelId } = req.body || {};
+  const data = loadAccounts();
+  const account = data.accounts.find(item => item.id === req.params.id);
+  if (!account) return res.status(404).json({ ok: false, error: 'Account không tồn tại' });
+  if (!(account.channels || []).some(channel => channel.id === channelId)) {
+    return res.status(404).json({ ok: false, error: 'Channel không tồn tại trong account' });
+  }
+  account.activeChannelId = channelId;
+  saveAccounts(data);
+  res.json({ ok: true, accounts: getPublicAccounts() });
+});
+
 app.post('/api/active-account', (req, res) => {
   const { accountId } = req.body || {};
   const data = loadAccounts();
