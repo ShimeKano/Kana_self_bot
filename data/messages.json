@@ -1,9 +1,11 @@
 {
-  "defaultMessage": ".tlt",
-  "messages": {
-    "tlt": ".tlt",
-    "tl": ".tl",
-    "tranyeu": ".tranyeu",
-    "pvp": ".pvp"
-  }
+  "defaultMessage": "hello",
+  "messages": [
+    {
+      "id": "greeting",
+      "text": "hello",
+      "intervalSeconds": 50,
+      "enabled": true
+    }
+  ]
 }
