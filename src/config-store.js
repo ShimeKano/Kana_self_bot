@@ -8,46 +8,19 @@ const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 
 function ensureDataFiles() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-
-  if (!fs.existsSync(ACCOUNTS_FILE)) {
-    fs.copyFileSync(ACCOUNTS_EXAMPLE, ACCOUNTS_FILE);
-  }
-
+  if (!fs.existsSync(ACCOUNTS_FILE)) fs.copyFileSync(ACCOUNTS_EXAMPLE, ACCOUNTS_FILE);
   if (!fs.existsSync(MESSAGES_FILE)) {
-    fs.writeFileSync(
-      MESSAGES_FILE,
-      JSON.stringify({ defaultMessage: '.tlt', messages: {} }, null, 2) + '\n'
-    );
+    fs.writeFileSync(MESSAGES_FILE, JSON.stringify({ defaultMessage: '.tlt', messages: {} }, null, 2) + '\n');
   }
 }
 
-function readJson(file) {
-  return JSON.parse(fs.readFileSync(file, 'utf8'));
-}
+function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+function writeJson(file, value) { fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', 'utf8'); }
 
-function writeJson(file, value) {
-  fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', 'utf8');
-}
-
-function loadAccounts() {
-  ensureDataFiles();
-  return readJson(ACCOUNTS_FILE);
-}
-
-function saveAccounts(value) {
-  ensureDataFiles();
-  writeJson(ACCOUNTS_FILE, value);
-}
-
-function loadMessages() {
-  ensureDataFiles();
-  return readJson(MESSAGES_FILE);
-}
-
-function saveMessages(value) {
-  ensureDataFiles();
-  writeJson(MESSAGES_FILE, value);
-}
+function loadAccounts() { ensureDataFiles(); return readJson(ACCOUNTS_FILE); }
+function saveAccounts(value) { ensureDataFiles(); writeJson(ACCOUNTS_FILE, value); }
+function loadMessages() { ensureDataFiles(); return readJson(MESSAGES_FILE); }
+function saveMessages(value) { ensureDataFiles(); writeJson(MESSAGES_FILE, value); }
 
 function maskToken(token) {
   if (!token) return '';
@@ -64,6 +37,7 @@ function getPublicAccounts() {
       name: account.name,
       tokenConfigured: Boolean(account.token),
       tokenPreview: maskToken(account.token),
+      activeChannelId: account.activeChannelId || account.channels?.[0]?.id || null,
       channels: (account.channels || []).map(channel => ({
         id: channel.id,
         name: channel.name || channel.id,
@@ -75,14 +49,13 @@ function getPublicAccounts() {
 
 function getActiveTarget() {
   const data = loadAccounts();
-  const account = (data.accounts || []).find(a => a.id === data.activeAccountId)
-    || (data.accounts || [])[0];
-
+  const account = (data.accounts || []).find(a => a.id === data.activeAccountId) || (data.accounts || [])[0];
   if (!account) return null;
 
-  const channel = (account.channels || [])[0];
-  if (!account.token || !channel?.id) return null;
+  const channel = (account.channels || []).find(c => c.id === account.activeChannelId)
+    || (account.channels || [])[0];
 
+  if (!account.token || !channel?.id) return null;
   return {
     accountId: account.id,
     accountName: account.name,
@@ -93,14 +66,7 @@ function getActiveTarget() {
 }
 
 module.exports = {
-  DATA_DIR,
-  ACCOUNTS_FILE,
-  MESSAGES_FILE,
-  ensureDataFiles,
-  loadAccounts,
-  saveAccounts,
-  loadMessages,
-  saveMessages,
-  getPublicAccounts,
-  getActiveTarget
+  DATA_DIR, ACCOUNTS_FILE, MESSAGES_FILE,
+  ensureDataFiles, loadAccounts, saveAccounts,
+  loadMessages, saveMessages, getPublicAccounts, getActiveTarget
 };
