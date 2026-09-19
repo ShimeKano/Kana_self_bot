@@ -1,191 +1,42 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Kana Control Panel</title>
-  <style>
-    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
-    body { margin: 0; background: #0b1020; color: #eef2ff; }
-    main { max-width: 1100px; margin: 0 auto; padding: 28px; }
-    h1 { margin-bottom: 6px; }
-    .muted { color: #94a3b8; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap: 16px; margin-top: 20px; }
-    .card { background:#11182b; border:1px solid #26314d; border-radius:16px; padding:18px; }
-    input, textarea, button { width:100%; box-sizing:border-box; border-radius:10px; border:1px solid #33415f; padding:10px 12px; margin:6px 0; background:#0b1222; color:#fff; }
-    button { cursor:pointer; background:#1d4ed8; border:0; }
-    button.danger { background:#991b1b; }
-    .row { display:flex; gap:8px; }
-    .row > * { flex:1; }
-    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#172554; margin:2px; font-size:12px; }
-    .account { border-top:1px solid #26314d; margin-top:14px; padding-top:14px; }
-    code { color:#93c5fd; }
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kana Control Panel</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif}body{margin:0;background:#0b1020;color:#eef2ff}main{max-width:1100px;margin:auto;padding:28px}.muted{color:#94a3b8}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:20px}.card{background:#11182b;border:1px solid #26314d;border-radius:16px;padding:18px}input,textarea,button{width:100%;box-sizing:border-box;border-radius:10px;border:1px solid #33415f;padding:10px 12px;margin:6px 0;background:#0b1222;color:#fff}button{cursor:pointer;background:#1d4ed8;border:0}.danger{background:#991b1b!important}.secondary{background:#334155!important}.row{display:flex;gap:8px}.row>*{flex:1}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#172554;margin:2px;font-size:12px}.account{border-top:1px solid #26314d;margin-top:14px;padding-top:14px}.message{border:1px solid #26314d;border-radius:12px;padding:12px;margin:10px 0}.message.active{border-color:#2563eb}.message textarea{min-height:60px}.message .row button{margin:3px 0}code{color:#93c5fd}
+</style>
 </head>
-<body>
-<main>
-  <h1>🛠 Kana Control Panel</h1>
-  <div class="muted">Local-only dashboard. Tokens are masked in the UI and stored only in your local ignored data file.</div>
-
-  <div class="grid">
-    <section class="card">
-      <h2>Accounts / Tokens</h2>
-      <div id="accounts"></div>
-      <h3>Thêm token</h3>
-      <input id="accountId" placeholder="Account ID, ví dụ main-2">
-      <input id="accountName" placeholder="Tên hiển thị">
-      <input id="accountToken" type="password" placeholder="Token">
-      <button onclick="addAccount()">+ Thêm token</button>
-    </section>
-
-    <section class="card">
-      <h2>Message Mode</h2>
-      <div class="row">
-        <button onclick="setAi(false)">Custom Message</button>
-        <button onclick="setAi(true)">AI Reply</button>
-      </div>
-      <p id="aiStatus" class="muted">AI: loading...</p>
-      <h2>Message</h2>
-      <input id="defaultMessage" placeholder="Tin nhắn mặc định">
-      <textarea id="messages" rows="10" placeholder='{"tlt": ".tlt"}'></textarea>
-      <button onclick="saveMessages()">Lưu message config</button>
-      <p class="muted">Muốn đổi message sau này chỉ sửa ở đây, không cần sửa logic scheduler.</p>
-    </section>
-  </div>
-
-  <section class="card" style="margin-top:16px">
-    <h2>Channels</h2>
-    <div id="channels"></div>
-    <div class="row">
-      <input id="channelAccountId" placeholder="Account ID">
-      <input id="channelId" placeholder="Channel ID">
-      <input id="channelName" placeholder="Tên channel">
-      <button onclick="addChannel()">+ Thêm channel</button>
-    </div>
-  </section>
+<body><main>
+<h1>🛠 Kana Control Panel</h1><div class="muted">Quản lý account, channel và lịch gửi custom message.</div>
+<div class="grid">
+<section class="card"><h2>Accounts / Tokens</h2><div id="accounts"></div><h3>Thêm account</h3><input id="accountId" placeholder="Account ID"><input id="accountName" placeholder="Tên hiển thị"><input id="accountToken" type="password" placeholder="Token"><button onclick="addAccount()">+ Thêm account</button></section>
+<section class="card"><h2>Message Mode</h2><div class="row"><button onclick="setAi(false)">📝 Custom Message</button><button onclick="setAi(true)">🤖 AI Reply</button></div><p id="aiStatus" class="muted">Loading...</p><p class="muted">Chỉ một chế độ hoạt động. AI ON sẽ dừng toàn bộ custom schedule.</p></section>
+</div>
+<section class="card" style="margin-top:16px"><h2>Custom Messages</h2><p class="muted">Nhập nhiều nội dung bằng dấu phẩy: <code>hello, him, chào bạn</code>. Chọn thời gian gửi riêng cho từng message.</p><div id="messages"></div><h3>Thêm message</h3><input id="newMessageId" placeholder="ID, ví dụ greeting"><input id="newMessageText" placeholder="Tin nhắn: hello, him"><input id="newMessageInterval" type="number" min="1" value="50" placeholder="Số giây"><button onclick="addMessage()">+ Thêm message</button><p id="defaultStatus" class="muted"></p></section>
+<section class="card" style="margin-top:16px"><h2>Channels</h2><div id="channels"></div><div class="row"><input id="channelAccountId" placeholder="Account ID"><input id="channelId" placeholder="Channel ID"><input id="channelName" placeholder="Tên channel"><button onclick="addChannel()">+ Thêm channel</button></div></section>
 </main>
 <script>
-async function api(url, options) {
-  const r = await fetch(url, { headers: {'Content-Type':'application/json'}, ...options });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || 'Request failed');
-  return data;
+let state=null;
+async function api(url,options){const r=await fetch(url,{headers:{'Content-Type':'application/json'},...options});const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function render(d){state=d;
+document.getElementById('accounts').innerHTML=d.accounts.map(a=>'<div class="account"><strong>'+esc(a.name)+'</strong> <span class="pill">'+(a.id===d.activeAccountId?'ACTIVE':'INACTIVE')+'</span><div class="muted">ID: <code>'+esc(a.id)+'</code></div><div>Token: <code>'+esc(a.tokenPreview||'not configured')+'</code></div><button onclick="activateAccount(\''+esc(a.id)+'\')">Chọn account</button><button class="danger" onclick="removeAccount(\''+esc(a.id)+'\')">Xóa account</button></div>').join('')||'<p class="muted">Chưa có account.</p>';
+document.getElementById('channels').innerHTML=d.accounts.flatMap(a=>(a.channels||[]).map(c=>'<div class="account"><strong>'+esc(a.name)+'</strong> → <code>'+esc(c.id)+'</code> <span class="pill">'+esc(c.name)+'</span><button onclick="activateChannel(\''+esc(a.id)+'\',\''+esc(c.id)+'\')">'+(a.activeChannelId===c.id?'✓ Đang chọn':'Chọn channel')+'</button><button class="danger" onclick="removeChannel(\''+esc(a.id)+'\',\''+esc(c.id)+'\')">Xóa channel</button></div>')).join('')||'<p class="muted">Chưa có channel.</p>';
+document.getElementById('messages').innerHTML=(d.messages.messages||[]).map(m=>'<div class="message '+(m.text===d.messages.defaultMessage?'active':'')+'"><strong>'+esc(m.id)+'</strong> <span class="pill">'+(m.text===d.messages.defaultMessage?'⭐ DEFAULT':'')+'</span><textarea id="txt-'+esc(m.id)+'">'+esc(m.text)+'</textarea><div class="row"><input id="int-'+esc(m.id)+'" type="number" min="1" value="'+m.intervalSeconds+'"><button onclick="updateMessage(\''+esc(m.id)+'\')">Lưu</button><button class="secondary" onclick="makeDefault(\''+esc(m.id)+'\')">Đặt mặc định</button><button class="danger" onclick="deleteMessage(\''+esc(m.id)+'\')">Xóa</button></div><small class="muted">Gửi mỗi '+m.intervalSeconds+' giây • '+(m.enabled?'ON':'OFF')+'</small></div>').join('')||'<p class="muted">Chưa có custom message.</p>';
+document.getElementById('defaultStatus').textContent='Tin nhắn mặc định: '+(d.messages.defaultMessage||'hello');
+document.getElementById('aiStatus').textContent=d.ai?.enabled?'🤖 AI Reply: ON — Custom schedule đang TẮT':'📝 Custom Message: ON — AI Reply đang TẮT';
 }
-
-function esc(value) {
-  return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-}
-
-function render(data) {
-  document.getElementById('accounts').innerHTML = data.accounts.map(a => `
-    <div class="account">
-      <strong>${esc(a.name)}</strong>
-      <span class="pill">${a.id === data.activeAccountId ? 'ACTIVE ACCOUNT' : 'INACTIVE'}</span>
-      <div class="muted">ID: <code>${esc(a.id)}</code></div>
-      <div>Token: <code>${esc(a.tokenPreview || 'not configured')}</code></div>
-      <button onclick="activateAccount('${esc(a.id)}')">Chọn account</button>
-      <button class="danger" onclick="removeAccount('${esc(a.id)}')">Xóa account</button>
-    </div>`).join('') || '<p class="muted">Chưa có account.</p>';
-
-  document.getElementById('channels').innerHTML = data.accounts.flatMap(a =>
-    (a.channels || []).map(c => `
-      <div class="account">
-        <strong>${esc(a.name)}</strong> → <code>${esc(c.id)}</code>
-        <span class="pill">${esc(c.name)}</span>
-        <button onclick="activateChannel('${esc(a.id)}','${esc(c.id)}')">${a.activeChannelId === c.id ? '✓ Đang chọn' : 'Chọn channel'}</button>
-        <button class="danger" onclick="removeChannel('${esc(a.id)}','${esc(c.id)}')">Xóa channel</button>
-      </div>`)).join('') || '<p class="muted">Chưa có channel.</p>';
-
-  document.getElementById('defaultMessage').value = data.messages.defaultMessage || '';
-  document.getElementById('messages').value = JSON.stringify(data.messages.messages || {}, null, 2);
-}
-
-async function load() {
-  const data = await api('/api/config');
-  render(data);
-  document.getElementById('aiStatus').textContent = data.ai?.enabled
-    ? 'AI Reply: ON — ' + (data.ai.model || 'Ollama')
-    : 'AI Reply: OFF — Custom Message mode';
-}
-
-async function addAccount() {
-  try {
-    await api('/api/accounts', {method:'POST', body:JSON.stringify({
-      id: document.getElementById('accountId').value.trim(),
-      name: document.getElementById('accountName').value.trim(),
-      token: document.getElementById('accountToken').value
-    })});
-    document.getElementById('accountToken').value = '';
-    await load();
-  } catch(e) { alert(e.message); }
-}
-
-async function removeAccount(id) {
-  if (!confirm('Xóa account này?')) return;
-  try { await api('/api/accounts/'+encodeURIComponent(id), {method:'DELETE'}); await load(); }
-  catch(e) { alert(e.message); }
-}
-
-async function activateAccount(id) {
-  try { await api('/api/active-account', {method:'POST', body:JSON.stringify({accountId:id})}); await load(); }
-  catch(e) { alert(e.message); }
-}
-
-async function addChannel() {
-  try {
-    const accountId = document.getElementById('channelAccountId').value.trim();
-    await api('/api/accounts/'+encodeURIComponent(accountId)+'/channels', {
-      method:'POST',
-      body:JSON.stringify({
-        channelId: document.getElementById('channelId').value.trim(),
-        name: document.getElementById('channelName').value.trim()
-      })
-    });
-    await load();
-  } catch(e) { alert(e.message); }
-}
-
-async function activateChannel(accountId, channelId) {
-  try {
-    await api('/api/accounts/'+encodeURIComponent(accountId)+'/active-channel', {
-      method:'POST', body:JSON.stringify({channelId})
-    });
-    await load();
-  } catch(e) { alert(e.message); }
-}
-
-async function removeChannel(accountId, channelId) {
-  if (!confirm('Xóa channel này?')) return;
-  try {
-    await api('/api/accounts/'+encodeURIComponent(accountId)+'/channels/'+encodeURIComponent(channelId), {method:'DELETE'});
-    await load();
-  } catch(e) { alert(e.message); }
-}
-
-async function setAi(enabled) {
-  try {
-    const data = await api('/api/ai/toggle', {
-      method:'POST',
-      body:JSON.stringify({enabled})
-    });
-    document.getElementById('aiStatus').textContent = data.ai.enabled
-      ? 'AI Reply: ON'
-      : 'AI Reply: OFF — Custom Message mode';
-  } catch(e) { alert(e.message); }
-}
-
-async function saveMessages() {
-  try {
-    const messages = JSON.parse(document.getElementById('messages').value || '{}');
-    await api('/api/messages', {method:'PUT', body:JSON.stringify({
-      defaultMessage: document.getElementById('defaultMessage').value,
-      messages
-    })});
-    alert('Đã lưu message config.');
-  } catch(e) { alert(e.message); }
-}
-
-load().catch(e => alert(e.message));
-</script>
-</body>
-</html>
+async function load(){const d=await api('/api/config');render(d)}
+async function addAccount(){try{await api('/api/accounts',{method:'POST',body:JSON.stringify({id:accountId.value.trim(),name:accountName.value.trim(),token:accountToken.value})});accountToken.value='';await load()}catch(e){alert(e.message)}}
+async function removeAccount(id){if(!confirm('Xóa account này?'))return;try{await api('/api/accounts/'+encodeURIComponent(id),{method:'DELETE'});await load()}catch(e){alert(e.message)}}
+async function activateAccount(id){try{await api('/api/active-account',{method:'POST',body:JSON.stringify({accountId:id})});await load()}catch(e){alert(e.message)}}
+async function addChannel(){try{const id=channelAccountId.value.trim();await api('/api/accounts/'+encodeURIComponent(id)+'/channels',{method:'POST',body:JSON.stringify({channelId:channelId.value.trim(),name:channelName.value.trim()})});await load()}catch(e){alert(e.message)}}
+async function activateChannel(a,c){try{await api('/api/accounts/'+encodeURIComponent(a)+'/active-channel',{method:'POST',body:JSON.stringify({channelId:c})});await load()}catch(e){alert(e.message)}}
+async function removeChannel(a,c){if(!confirm('Xóa channel này?'))return;try{await api('/api/accounts/'+encodeURIComponent(a)+'/channels/'+encodeURIComponent(c),{method:'DELETE'});await load()}catch(e){alert(e.message)}}
+async function setAi(enabled){try{await api('/api/ai/toggle',{method:'POST',body:JSON.stringify({enabled})});await load()}catch(e){alert(e.message)}}
+async function addMessage(){try{await api('/api/messages',{method:'POST',body:JSON.stringify({id:newMessageId.value.trim(),text:newMessageText.value,intervalSeconds:Number(newMessageInterval.value)})});newMessageId.value='';newMessageText.value='';await load()}catch(e){alert(e.message)}}
+async function updateMessage(id){try{await api('/api/messages/'+encodeURIComponent(id),{method:'PUT',body:JSON.stringify({text:document.getElementById('txt-'+id).value,intervalSeconds:Number(document.getElementById('int-'+id).value)})});await load()}catch(e){alert(e.message)}}
+async function deleteMessage(id){if(!confirm('Xóa message này?'))return;try{await api('/api/messages/'+encodeURIComponent(id),{method:'DELETE'});await load()}catch(e){alert(e.message)}}
+async function makeDefault(id){try{await api('/api/messages/default',{method:'POST',body:JSON.stringify({id})});await load()}catch(e){alert(e.message)}}
+load().catch(e=>alert(e.message));
+</script></body></html>
