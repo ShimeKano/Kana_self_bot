@@ -1,12 +1,12 @@
 const axios = require('axios');
 const config = require('../config');
-const { getActiveTarget, disableAccount, setAccountTokenStatus } = require('./config-store');
+const { getActiveTarget, disableAccount, failoverFromAccount, setAccountTokenStatus } = require('./config-store');
 
 function createApi(token) { return axios.create({ baseURL: config.discord.apiBase, headers: { Authorization: token, 'Content-Type': 'application/json', 'User-Agent': config.discord.userAgent }, timeout: 15000 }); }
 function resolveTarget(target) { const resolved = target || getActiveTarget(); if (!resolved?.token || !resolved?.channelId) throw new Error('Chưa có account/token/channel đang hoạt động'); return resolved; }
 function handleError(error, action, target = null) {
   const status = error.response?.status; const responseData = error.response?.data; let errorCode='UNKNOWN_ERROR'; let errorMessage=error.message;
-  if(status===401){errorCode='UNAUTHORIZED';errorMessage='Token không hợp lệ hoặc hết hạn';if(target?.accountId)disableAccount(target.accountId,errorMessage);}
+  if(status===401){errorCode='UNAUTHORIZED';errorMessage='Token không hợp lệ hoặc hết hạn';if(target?.accountId){disableAccount(target.accountId,errorMessage);failoverFromAccount(target.accountId);}}
   else if(status===403){errorCode='FORBIDDEN';errorMessage='Không có quyền thực hiện thao tác này';}
   else if(status===404){errorCode='NOT_FOUND';errorMessage='Channel hoặc resource không tồn tại';}
   else if(status===429){errorCode='RATE_LIMITED';errorMessage='Bị giới hạn tốc độ - thử lại sau '+(responseData?.retry_after||5)+'s';}
