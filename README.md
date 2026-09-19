@@ -1,18 +1,57 @@
-# 1. Tạo thư mục & copy tất cả file trên
-cd Kana_self_bot
+# Kana Self Bot
 
-# 2. Cài dependencies
+Local Discord automation with a separate configuration layer and a local control panel.
+
+## Quick start
+
+```bash
 npm install
-
-# 3. Copy .env.example thành .env & điền token
-cp .env.example .env
-# Mở .env, điền DISCORD_TOKEN & CHANNEL_ID
-
-# 4. Chạy
 npm start
+```
 
-# Hoặc chạy chế độ dev (tự restart khi sửa code)
-npm run dev
+Open **http://127.0.0.1:3000**.
 
-# Kiểm tra cấu trúc
+On first start, the app creates `data/accounts.json` from `data/accounts.example.json`.
+
+## Configuration is separated
+
+- `data/accounts.json` → tokens + accounts + channels. **Ignored by Git.**
+- `data/messages.json` → messages/commands. Change these without editing scheduler logic.
+- `web/index.html` → local dashboard for adding/removing accounts and channels.
+- `.env` → only non-secret runtime settings such as the dashboard port.
+
+The dashboard masks tokens and listens on **127.0.0.1 only**. Do not expose it publicly.
+
+## Multiple accounts and channels
+
+1. Add an account and token in **Accounts / Tokens**.
+2. Add one or more channel IDs for that account.
+3. Select the active account and active channel.
+4. Scheduled tasks use the selected account/channel.
+5. Change a message in the **Message** panel; the scheduler reads the new value without changing its code.
+
+Example `data/messages.json`:
+
+```json
+{
+  "defaultMessage": ".tlt",
+  "messages": {
+    "tlt": ".tlt",
+    "tl": ".tl",
+    "tranyeu": ".tranyeu",
+    "pvp": ".pvp"
+  }
+}
+```
+
+Replace any value with whatever message/command you need.
+
+## Security
+
+Never commit a real token. If a token has already been exposed publicly, revoke/rotate it immediately. Keep `data/accounts.json` local.
+
+## Tests
+
+```bash
 npm test
+```

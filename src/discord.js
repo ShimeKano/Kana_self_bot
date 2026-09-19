@@ -1,28 +1,30 @@
 const axios = require('axios');
 const config = require('../config');
+const { getActiveTarget } = require('./config-store');
 
-if (!config.discord.token) {
-  throw new Error('[Discord] DISCORD_TOKEN chưa được cấu hình trong .env');
+function createApi(token) {
+  return axios.create({
+    baseURL: config.discord.apiBase,
+    headers: {
+      Authorization: token,
+      'Content-Type': 'application/json',
+      'User-Agent': config.discord.userAgent
+    },
+    timeout: 15000
+  });
 }
 
-if (!config.discord.channelId) {
-  throw new Error('[Discord] CHANNEL_ID chưa được cấu hình trong .env');
+function resolveTarget(target) {
+  const resolved = target || getActiveTarget();
+  if (!resolved?.token || !resolved?.channelId) {
+    throw new Error('Chưa có account/token/channel đang hoạt động');
+  }
+  return resolved;
 }
-
-const api = axios.create({
-  baseURL: config.discord.apiBase,
-  headers: {
-    Authorization: config.discord.token,
-    'Content-Type': 'application/json',
-    'User-Agent': config.discord.userAgent
-  },
-  timeout: 15000
-});
 
 function handleError(error, action) {
   const status = error.response?.status;
   const responseData = error.response?.data;
-
   let errorCode = 'UNKNOWN_ERROR';
   let errorMessage = error.message;
 
@@ -43,98 +45,51 @@ function handleError(error, action) {
     errorMessage = 'Yêu cầu vượt quá thời gian chờ';
   }
 
-  console.error(
-    `[Discord API] Lỗi ${action}: ${status || 'NETWORK'} - ${errorMessage}`
-  );
-
-  if (responseData) {
-    console.error(
-      '[Discord API] Chi tiết:',
-      JSON.stringify(responseData, null, 2)
-    );
-  }
-
-  return {
-    ok: false,
-    error: errorCode,
-    status,
-    message: errorMessage,
-    details: responseData
-  };
+  console.error(`[Discord API] ${action}: ${status || 'NETWORK'} - ${errorMessage}`);
+  return { ok: false, error: errorCode, status, message: errorMessage, details: responseData };
 }
 
-/**
- * Gửi một message vào channel đã cấu hình.
- */
-async function sendMessage(content) {
+async function sendMessage(content, target) {
   try {
+    const resolved = resolveTarget(target);
+    const api = createApi(resolved.token);
     const response = await api.post(
-      `/channels/${config.discord.channelId}/messages`,
-      {
-        content,
-        tts: false,
-        flags: 0
-      }
+      `/channels/${resolved.channelId}/messages`,
+      { content, tts: false, flags: 0 }
     );
-
     return {
       ok: true,
       data: response.data,
-      messageId: response.data?.id || null
+      messageId: response.data?.id || null,
+      accountId: resolved.accountId,
+      channelId: resolved.channelId
     };
   } catch (error) {
     return handleError(error, `gửi "${content}"`);
   }
 }
 
-/**
- * Lấy message mới nhất trong channel.
- */
-async function fetchMessages(limit = 10) {
+async function fetchMessages(limit = 10, target) {
   try {
+    const resolved = resolveTarget(target);
+    const api = createApi(resolved.token);
     const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 100);
-
     const response = await api.get(
-      `/channels/${config.discord.channelId}/messages?limit=${safeLimit}`
+      `/channels/${resolved.channelId}/messages?limit=${safeLimit}`
     );
-
-    return {
-      ok: true,
-      data: response.data
-    };
+    return { ok: true, data: response.data };
   } catch (error) {
     return handleError(error, 'lấy tin nhắn');
   }
 }
 
-/**
- * Alias được automation/monitor sử dụng.
- */
-async function fetchLatestMessages(limit = 10) {
-  return fetchMessages(limit);
+async function fetchLatestMessages(limit = 10, target) {
+  return fetchMessages(limit, target);
 }
 
-/**
- * Giữ API clickButton của code cũ để các module khác không bị crash.
- * Phần component interaction được giữ tách biệt với sendMessage().
- */
 async function clickButton(messageId, componentId) {
-  if (!messageId) {
-    return {
-      ok: false,
-      error: 'MESSAGE_ID_REQUIRED',
-      message: 'Thiếu messageId'
-    };
-  }
-
-  if (!componentId) {
-    return {
-      ok: false,
-      error: 'COMPONENT_ID_REQUIRED',
-      message: 'Thiếu componentId'
-    };
-  }
-
+  if (!messageId) return { ok: false, error: 'MESSAGE_ID_REQUIRED', message: 'Thiếu messageId' };
+  if (!componentId) return { ok: false, error: 'COMPONENT_ID_REQUIRED', message: 'Thiếu componentId' };
   return {
     ok: false,
     error: 'COMPONENT_ACTION_NOT_IMPLEMENTED',
@@ -142,9 +97,4 @@ async function clickButton(messageId, componentId) {
   };
 }
 
-module.exports = {
-  sendMessage,
-  fetchMessages,
-  fetchLatestMessages,
-  clickButton
-};
+module.exports = { sendMessage, fetchMessages, fetchLatestMessages, clickButton };
