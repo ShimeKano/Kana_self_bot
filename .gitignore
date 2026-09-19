@@ -3,3 +3,5 @@ node_modules/
 data/accounts.json
 *.log
 .DS_Store
+data/ai.json
+data/memory/

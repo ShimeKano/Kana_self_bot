@@ -5,11 +5,19 @@ const config = require('../config');
 const { aiListener } = require('./ai/ai-listener');
 const { verifyToken, sendMessage } = require('./discord');
 const { scheduler } = require('./automation-core');
+const { scanModels } = require('./ai/ai-provider');
+const { loadAiSettings, saveAiSettings, getPublicAiSettings } = require('./ai/ai-settings-store');
+const { loadMemory, clearMemory } = require('./memory-store');
 
 const app = express();
 app.use(express.json({ limit: '64kb' }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'web', 'index.html')));
-app.get('/api/config', (req, res) => res.json({...getPublicAccounts(),messages:loadMessages(),ai:aiListener.getStatus(),scheduler:scheduler.getStatus()}));
+app.get('/api/config', (req, res) => res.json({...getPublicAccounts(),messages:loadMessages(),ai:{...aiListener.getStatus(),settings:getPublicAiSettings()},scheduler:scheduler.getStatus()}));
+app.post('/api/ai/scan', async (req,res)=>{try{const apiKey=String(req.body?.apiKey||'').trim();if(!apiKey)throw new Error('API key không được để trống');const result=await scanModels(apiKey);const settings=saveAiSettings({apiKey,provider:result.provider.id,apiBase:result.provider.base,models:result.models,model:result.models.includes(loadAiSettings().model)?loadAiSettings().model:result.models[0]});res.json({ok:true,provider:result.provider,models:result.models,model:settings.model,ai:getPublicAiSettings()});}catch(e){res.status(400).json({ok:false,error:e.message})}});
+app.post('/api/ai/model', (req,res)=>{try{const model=String(req.body?.model||'').trim(),s=loadAiSettings();if(!model||!s.models.includes(model))return res.status(400).json({ok:false,error:'Model không nằm trong danh sách đã scan'});saveAiSettings({model});res.json({ok:true,ai:getPublicAiSettings()});}catch(e){res.status(400).json({ok:false,error:e.message})}});
+app.post('/api/ai/toggle',(req,res)=>{try{const enabled=Boolean(req.body?.enabled);aiListener.setEnabled(enabled);saveAiSettings({enabled});if(enabled)scheduler.stopCustomTimers();else scheduler.sync();res.json({ok:true,ai:{...aiListener.getStatus(),settings:getPublicAiSettings()},scheduler:scheduler.getStatus()});}catch(e){res.status(400).json({ok:false,error:e.message})}});
+app.get('/api/ai/memory/:accountId',(req,res)=>{try{res.json({ok:true,accountId:req.params.accountId,messages:loadMemory(req.params.accountId,100000)});}catch(e){res.status(400).json({ok:false,error:e.message})}});
+app.delete('/api/ai/memory/:accountId',(req,res)=>{try{clearMemory(req.params.accountId);res.json({ok:true});}catch(e){res.status(400).json({ok:false,error:e.message})}});
 
 app.put('/api/accounts/:id',(req,res)=>{try{const account=updateAccount(req.params.id,req.body||{});if(!account)return res.status(404).json({ok:false,error:'Account không tồn tại'});res.json({ok:true,accounts:getPublicAccounts()})}catch(e){res.status(400).json({ok:false,error:e.message})}});
 app.post('/api/accounts/:id/verify',async(req,res)=>{const data=loadAccounts(),a=data.accounts.find(x=>x.id===req.params.id);if(!a)return res.status(404).json({ok:false,error:'Account không tồn tại'});if(a.disabled)enableAccount(a.id);const target={accountId:a.id,accountName:a.name,token:a.token,channelId:(a.channels||[])[0]?.id};if(!target.token)return res.status(400).json({ok:false,error:'Account chưa có token'});const result=await verifyToken(target);res.status(result.ok?200:400).json({...result,accounts:getPublicAccounts()})});
@@ -28,7 +36,7 @@ app.delete('/api/messages/:id',(req,res)=>{const d=loadMessages(),n=d.messages.l
 app.post('/api/messages/send-now',(req,res)=>{const d=loadMessages(),m=d.messages.find(x=>x.id===req.body?.id);if(!m)return res.status(404).json({ok:false,error:'Message không tồn tại'});if(aiListener.enabled)return res.status(409).json({ok:false,error:'AI Reply đang bật'});sendMessage(m.text).then(result=>res.status(result.ok?200:400).json(result)).catch(e=>res.status(500).json({ok:false,error:e.message}))});
 app.post('/api/messages/toggle',(req,res)=>{const d=loadMessages(),m=d.messages.find(x=>x.id===req.body?.id);if(!m)return res.status(404).json({ok:false,error:'Message không tồn tại'});m.enabled=Boolean(req.body.enabled);saveMessages(d);scheduler.sync();res.json({ok:true,messages:loadMessages(),scheduler:scheduler.getStatus()})});
 app.post('/api/messages/default',(req,res)=>{const d=loadMessages(),m=d.messages.find(x=>x.id===req.body?.id);if(!m)return res.status(404).json({ok:false,error:'Message không tồn tại'});d.defaultMessage=m.text;saveMessages(d);res.json({ok:true,messages:loadMessages()})});
-app.post('/api/ai/toggle',(req,res)=>{const enabled=Boolean(req.body?.enabled);aiListener.setEnabled(enabled);if(enabled)scheduler.stopCustomTimers();else scheduler.sync();res.json({ok:true,ai:aiListener.getStatus(),scheduler:scheduler.getStatus()})});
+
 app.get('/api/health',(req,res)=>res.json({ok:true,service:'Kana local dashboard',port:config.server.port}));
 function startDashboard(){app.listen(config.server.port,'127.0.0.1',()=>console.log(`[Dashboard] 🚀 http://127.0.0.1:${config.server.port}`))}
 module.exports={startDashboard};
