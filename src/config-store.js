@@ -125,6 +125,47 @@ function getPublicAccounts() {
   };
 }
 
+function failoverFromAccount(failedAccountId) {
+  const data = loadAccounts();
+  const accounts = data.accounts || [];
+  if (!failedAccountId || !accounts.length) return null;
+
+  const failedIndex = accounts.findIndex(account => account.id === failedAccountId);
+  if (failedIndex < 0) return null;
+
+  // Do not let a stale 401 response from an old request override a newer active account.
+  if (data.activeAccountId !== failedAccountId) {
+    return getActiveTarget();
+  }
+
+  for (let offset = 1; offset <= accounts.length; offset += 1) {
+    const account = accounts[(failedIndex + offset) % accounts.length];
+    if (!account || account.id === failedAccountId || account.disabled) continue;
+    if (!account.token || !Array.isArray(account.channels) || !account.channels.some(channel => channel?.id)) continue;
+
+    const channel = account.channels.find(channel => channel?.id === account.activeChannelId)
+      || account.channels.find(channel => channel?.id);
+
+    if (!channel?.id) continue;
+
+    data.activeAccountId = account.id;
+    account.activeChannelId = channel.id;
+    saveAccounts(data);
+
+    console.warn(`[Failover] Chuyển từ account "${failedAccountId}" sang "${account.id}"`);
+    return {
+      accountId: account.id,
+      accountName: account.name,
+      token: account.token,
+      channelId: channel.id,
+      channelName: channel.name || channel.id
+    };
+  }
+
+  console.error('[Failover] Không còn account nào có token/channel khả dụng');
+  return null;
+}
+
 function getActiveTarget() {
   const data = loadAccounts();
   const account = (data.accounts || []).find(a => a.id === data.activeAccountId) || (data.accounts || [])[0];
