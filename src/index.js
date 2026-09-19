@@ -3,6 +3,7 @@ const config = require('../config');
 const { ensureDataFiles, getPublicAccounts } = require('./config-store');
 const { startDashboard } = require('./dashboard');
 const { aiListener } = require('./ai/ai-listener');
+const { loadAiSettings } = require('./ai/ai-settings-store');
 
 function printStartupInfo() {
   console.log('\n╔════════════════════════════════════════════════════════════╗');
@@ -18,7 +19,7 @@ try {
   ensureDataFiles();
   printStartupInfo();
   startDashboard();
-  if (config.ai?.enabled) aiListener.start();
+  if (loadAiSettings().enabled) aiListener.start();
   scheduler.startAll();
 
   console.log('✅ Scheduler đang chạy. Nhấn Ctrl+C để dừng.\n');
