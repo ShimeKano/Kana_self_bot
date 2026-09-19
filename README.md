@@ -249,7 +249,7 @@ Run:
 npm test
 ```
 
-The repository includes scheduler and automation checks. Before using real account data, verify the dashboard and configuration locally.
+The repository includes a basic scheduler initialization test. Before using real account data, verify the dashboard and configuration locally.
 
 ## Security
 
