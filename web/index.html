@@ -39,6 +39,12 @@
     </section>
 
     <section class="card">
+      <h2>Message Mode</h2>
+      <div class="row">
+        <button onclick="setAi(false)">Custom Message</button>
+        <button onclick="setAi(true)">AI Reply</button>
+      </div>
+      <p id="aiStatus" class="muted">AI: loading...</p>
       <h2>Message</h2>
       <input id="defaultMessage" placeholder="Tin nhắn mặc định">
       <textarea id="messages" rows="10" placeholder='{"tlt": ".tlt"}'></textarea>
@@ -94,7 +100,13 @@ function render(data) {
   document.getElementById('messages').value = JSON.stringify(data.messages.messages || {}, null, 2);
 }
 
-async function load() { render(await api('/api/config')); }
+async function load() {
+  const data = await api('/api/config');
+  render(data);
+  document.getElementById('aiStatus').textContent = data.ai?.enabled
+    ? 'AI Reply: ON — ' + (data.ai.model || 'Ollama')
+    : 'AI Reply: OFF — Custom Message mode';
+}
 
 async function addAccount() {
   try {
@@ -147,6 +159,18 @@ async function removeChannel(accountId, channelId) {
   try {
     await api('/api/accounts/'+encodeURIComponent(accountId)+'/channels/'+encodeURIComponent(channelId), {method:'DELETE'});
     await load();
+  } catch(e) { alert(e.message); }
+}
+
+async function setAi(enabled) {
+  try {
+    const data = await api('/api/ai/toggle', {
+      method:'POST',
+      body:JSON.stringify({enabled})
+    });
+    document.getElementById('aiStatus').textContent = data.ai.enabled
+      ? 'AI Reply: ON'
+      : 'AI Reply: OFF — Custom Message mode';
   } catch(e) { alert(e.message); }
 }
 
