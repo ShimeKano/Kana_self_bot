@@ -74,14 +74,16 @@ function normalizeMessages(data) {
   }
 
   const legacy = source.messages && typeof source.messages === 'object' ? source.messages : {};
-  const legacyIntervals = { tl: 65, tranyeu: 25, pvp: 305, tlt: 60 };
+  // Older task-based message entries are intentionally ignored. Custom messages
+  // are now the only supported scheduler configuration.
+  const removedLegacyIds = new Set(['tl', 'tranyeu', 'pvp', 'tlt']);
   return {
     defaultMessage,
     messages: Object.entries(legacy)
+      .filter(([id, text]) => !removedLegacyIds.has(String(id).toLowerCase()))
       .filter(([, text]) => typeof text === 'string' && text.trim())
       .map(([id, text]) => ({
-        id: String(id), text: text.trim(),
-        intervalSeconds: legacyIntervals[id] || 60, enabled: true
+        id: String(id), text: text.trim(), intervalSeconds: 60, enabled: true
       }))
   };
 }
