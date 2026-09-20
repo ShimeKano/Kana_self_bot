@@ -17,6 +17,9 @@ class AiListener {
     this.lastReplyAt = 0;
     this.userId = null;
     this.processing = false;
+    this.lastError = null;
+    this.lastEventAt = null;
+    this.repliesSent = 0;
   }
 
   async poll() {
@@ -37,32 +40,68 @@ class AiListener {
     try {
       if (!this.userId) {
         const identity = await fetchCurrentUser(target);
-        if (identity.ok) this.userId = identity.data?.id || null;
+        if (!identity.ok) {
+          this.lastError = 'Discord identity: ' + (identity.message || identity.error || 'unknown error');
+          return;
+        }
+        this.userId = identity.data?.id || null;
       }
 
       const result = await fetchLatestMessages(20, target);
-      if (!result.ok) return;
+      if (!result.ok) {
+        this.lastError = 'Discord messages: ' + (result.message || result.error || 'unknown error');
+        return;
+      }
 
       for (const message of [...(result.data || [])].reverse()) {
         if (!message?.id || this.seenIds.has(message.id)) continue;
-        this.seenIds.add(message.id);
-        if (!message.content?.trim()) continue;
-        if (this.userId && message.author?.id === this.userId) continue;
-        if (message.author?.bot) continue;
+        if (!message.content?.trim()) {
+          this.seenIds.add(message.id);
+          continue;
+        }
+        if (this.userId && message.author?.id === this.userId) {
+          this.seenIds.add(message.id);
+          continue;
+        }
+        if (message.author?.bot) {
+          this.seenIds.add(message.id);
+          continue;
+        }
         if (Date.now() - this.lastReplyAt < this.cooldownMs) continue;
 
-        const normalized = { authorId: message.author?.id || 'user', content: String(message.content).trim() };
-        this.history.push(normalized);
-        if (this.history.length > 40) this.history.shift();
+        const normalized = {
+          authorId: message.author?.id || 'user',
+          content: String(message.content).trim()
+        };
 
-        const reply = await generateReply({ ...settings, message: normalized, history: this.history.slice(0, -1) });
-        const sent = await sendMessage(reply, target);
-        if (sent.ok) {
+        try {
+          const history = this.history.slice(-20);
+          const reply = await generateReply({
+            ...settings,
+            message: normalized,
+            history
+          });
+
+          const sent = await sendMessage(reply, target);
+          if (!sent.ok) {
+            this.lastError = 'Discord send: ' + (sent.message || sent.error || 'unknown error');
+            continue;
+          }
+
           this.lastReplyAt = Date.now();
-          const assistant = { authorId: 'assistant', content: reply };
-          this.history.push(assistant);
-          appendMemory(target.accountId, [normalized, assistant]);
-          if (this.history.length > 40) this.history.shift();
+          this.lastEventAt = new Date().toISOString();
+          this.repliesSent += 1;
+          this.lastError = null;
+          this.history.push(normalized, { authorId: 'assistant', content: reply });
+          this.history = this.history.slice(-40);
+          appendMemory(target.accountId, [normalized, { authorId: 'assistant', content: reply }]);
+
+          // Only mark a message as seen after a successful response or an intentional skip.
+          this.seenIds.add(message.id);
+        } catch (error) {
+          // Keep the message unseen so a transient API failure can be retried.
+          this.lastError = error.message;
+          console.error('[AI] ' + error.message);
         }
       }
     } finally {
@@ -73,8 +112,15 @@ class AiListener {
   start() {
     if (this.timer) return;
     this.enabled = true;
-    this.poll().catch(error => console.error('[AI]', error.message));
-    this.timer = setInterval(() => this.poll().catch(error => console.error('[AI]', error.message)), this.intervalMs);
+    this.lastError = null;
+    this.poll().catch(error => {
+      this.lastError = error.message;
+      console.error('[AI] ' + error.message);
+    });
+    this.timer = setInterval(() => this.poll().catch(error => {
+      this.lastError = error.message;
+      console.error('[AI] ' + error.message);
+    }), this.intervalMs);
   }
 
   stop() {
@@ -102,9 +148,13 @@ class AiListener {
       provider: settings.provider || null,
       model: settings.model || null,
       apiConfigured: Boolean(settings.apiKey),
-      memoryMessages: target ? loadMemory(target.accountId, 100000).length : 0
+      memoryMessages: target ? loadMemory(target.accountId, 100000).length : 0,
+      lastError: this.lastError,
+      lastEventAt: this.lastEventAt,
+      repliesSent: this.repliesSent
     };
   }
 }
+
 const aiListener = new AiListener();
 module.exports = { AiListener, aiListener };
