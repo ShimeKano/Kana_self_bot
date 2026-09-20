@@ -49,7 +49,7 @@ async function generateReply({ apiKey, providerId, provider, apiBase, model, mes
 
   const selected = PROVIDERS[selectedId];
   if (!selected) throw new Error('AI provider chưa được cấu hình');
-  if (!apiKey) throw new Error('API key không có; hãy dùng Ollama fallback hoặc nhập API key');
+  if (!apiKey) throw new Error('API key không có; hãy nhập API key để dùng provider này hoặc cấu hình Ollama như một lựa chọn thay thế');
 
   const base = String(apiBase || selected.base).replace(/\/$/, '');
   const messages = buildMessages(message, history);
