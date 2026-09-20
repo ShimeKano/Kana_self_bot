@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node tests/scheduler.test.js && node tests/ai.test.js"
+    "test": "node tests/dashboard-syntax.test.js && node tests/scheduler.test.js && node tests/ai.test.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
