@@ -156,8 +156,7 @@ Kana_self_bot/
 │   ├── config-store.js
 │   ├── dashboard.js
 │   ├── discord.js
-│   ├── index.js
-│   └── monitor.js
+│   └── index.js
 ├── tests/
 ├── web/
 │   └── index.html
