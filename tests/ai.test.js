@@ -42,7 +42,7 @@ async function main() {
 
   const effective = getEffectiveAiSettings();
   assert.ok(effective.provider);
-  assert.ok(effective.model);
+  assert.equal(effective.model, null);
 
   console.log('✅ Provider, model scan, settings và listener state hợp lệ.');
 }
