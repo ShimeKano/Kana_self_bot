@@ -21,6 +21,7 @@ class AiListener {
     this.lastEventAt = null;
     this.repliesSent = 0;
     this.logs = [];
+    this.baselineReady = false;
   }
 
   log(level, message, data = null) {
@@ -44,6 +45,7 @@ class AiListener {
       this.lastChannelId = target.channelId;
       this.lastAccountId = target.accountId;
       this.seenIds.clear();
+      this.baselineReady = false;
       this.history = loadMemory(target.accountId, 40);
       this.userId = null;
       this.log('INFO', 'Đổi AI target', { accountId: target.accountId, channelId: target.channelId });
@@ -66,6 +68,16 @@ class AiListener {
       if (!result.ok) {
         this.log('ERROR', 'Không đọc được channel messages', { error: result.message || result.error || 'unknown error' });
         this.lastError = 'Discord messages: ' + (result.message || result.error || 'unknown error');
+        return;
+      }
+
+      if (!this.baselineReady) {
+        for (const message of result.data || []) {
+          if (message?.id) this.seenIds.add(message.id);
+        }
+        this.baselineReady = true;
+        this.lastEventAt = new Date().toISOString();
+        this.log('INFO', 'Đã tạo baseline message; bỏ qua tin cũ', { count: this.seenIds.size });
         return;
       }
 
@@ -149,6 +161,8 @@ class AiListener {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.processing = false;
+    this.seenIds.clear();
+    this.baselineReady = false;
   }
 
   setEnabled(enabled) {
