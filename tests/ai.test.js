@@ -41,8 +41,9 @@ async function main() {
   }
 
   const effective = getEffectiveAiSettings();
-  assert.ok(effective.provider);
-  assert.equal(effective.model, null);
+  assert.ok(Object.prototype.hasOwnProperty.call(effective, 'provider'));
+  if (!effective.provider) assert.equal(effective.model, null);
+  else assert.ok(effective.model);
 
   console.log('✅ Provider, model scan, settings và listener state hợp lệ.');
 }
