@@ -18,7 +18,7 @@ for (const file of sourceFiles) {
 }
 
 const html = fs.readFileSync(path.join(repoRoot, 'web', 'index.html'), 'utf8');
-const scripts = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/gi)].map(match => match[1]);
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
 assert.ok(scripts.length > 0, 'Dashboard script not found');
 for (const script of scripts) new vm.Script(script, { filename: 'web/index.html<script>' });
 console.log('✅ Toàn bộ JavaScript trong src/ và dashboard đều hợp lệ về cú pháp.');
