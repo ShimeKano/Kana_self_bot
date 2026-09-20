@@ -18,7 +18,7 @@ Local Discord automation with a dashboard for managing accounts, channels, custo
 - ⏯️ Enable/disable individual messages
 - ⭐ Default message
 - 🚀 Send Now
-- 🤖 Optional AI Reply using an OpenAI-compatible API
+- 🤖 Optional AI Reply using OpenAI/OpenRouter or explicitly selected Ollama
 - 🔍 API/model discovery from the dashboard
 - 🧠 Persistent per-account AI memory in `data/memory/<accountId>.mess.txt`
 - 🖥️ Live AI terminal logs in the dashboard
@@ -83,7 +83,9 @@ Message content and intervals are configuration data, separate from scheduler co
 4. Select a discovered model.
 5. Turn AI on.
 
-The API key is stored locally in `data/ai.json`, which is ignored by Git. AI settings are not required in `.env`.
+The API key is stored locally in `data/ai.json`, which is ignored by Git. AI settings are not required in `.env`. An API error remains an API error; Ollama is an explicit alternative and is never used automatically as an API fallback.
+
+To use Ollama instead, install/start it from the dashboard, scan or download a model, then select an Ollama model in the Ollama section. Selecting an Ollama model explicitly switches the configured AI provider to Ollama.
 
 AI uses the active account/channel and polls for new messages. When AI starts or the active target changes, existing messages are treated as a baseline and are not answered retroactively.
 
@@ -154,8 +156,7 @@ Kana_self_bot/
 │   ├── config-store.js
 │   ├── dashboard.js
 │   ├── discord.js
-│   ├── index.js
-│   └── monitor.js
+│   └── index.js
 ├── tests/
 ├── web/
 │   └── index.html
@@ -170,7 +171,7 @@ Kana_self_bot/
 npm test
 ```
 
-The test suite currently covers scheduler initialization.
+The test suite validates dashboard JavaScript syntax, all `src/*.js` syntax, scheduler behavior, AI provider detection/model scanning, and AI settings behavior.
 
 ## Security
 

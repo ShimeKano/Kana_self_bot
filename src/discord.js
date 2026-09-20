@@ -18,5 +18,4 @@ async function fetchMessages(limit=10,target){try{const r=resolveTarget(target);
 async function fetchLatestMessages(limit=10,target){return fetchMessages(limit,target);}
 async function fetchCurrentUser(target){try{const r=resolveTarget(target);const response=await createApi(r.token).get('/users/@me');return{ok:true,data:response.data};}catch(error){return handleError(error,'lấy thông tin account',target);}}
 async function verifyToken(target){try{const r=resolveTarget(target);const response=await createApi(r.token).get('/users/@me');setAccountTokenStatus(r.accountId,'valid',null);return{ok:true,data:response.data};}catch(error){return handleError(error,'kiểm tra token',target);}}
-async function clickButton(messageId,componentId){if(!messageId)return{ok:false,error:'MESSAGE_ID_REQUIRED',message:'Thiếu messageId'};if(!componentId)return{ok:false,error:'COMPONENT_ID_REQUIRED',message:'Thiếu componentId'};return{ok:false,error:'COMPONENT_ACTION_NOT_IMPLEMENTED',message:'Component interaction adapter chưa được triển khai'};}
-module.exports={sendMessage,fetchMessages,fetchLatestMessages,fetchCurrentUser,verifyToken,clickButton};
+module.exports={sendMessage,fetchMessages,fetchLatestMessages,fetchCurrentUser,verifyToken};
