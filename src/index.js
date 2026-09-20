@@ -26,9 +26,8 @@ async function start() {
         await aiListener.setEnabled(true);
         console.log('🤖 AI Reply đã khởi động.');
       } catch (error) {
-        saveAiSettings({ enabled: false });
-        aiListener.log('WARN', 'AI không khởi động được; đã tắt AI', { error: error.message });
-        console.warn('⚠️ AI không khởi động được:', error.message);
+        aiListener.log('WARN', 'AI chưa khởi động được; AI vẫn giữ trạng thái đã cấu hình', { error: error.message });
+        console.warn('⚠️ AI chưa khởi động được:', error.message);
       }
     }
 
