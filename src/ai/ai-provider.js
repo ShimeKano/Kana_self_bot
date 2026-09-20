@@ -18,7 +18,20 @@ function cleanModels(data) {
     .sort((a, b) => a.localeCompare(b));
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), timeoutMs);\n  try {\n    return await fetch(url, { ...options, signal: controller.signal });\n  } catch (error) {\n    if (error?.name === 'AbortError') throw new Error('AI provider timeout sau '+Math.round(timeoutMs/1000)+' giây');\n    throw error;\n  } finally {\n    clearTimeout(timer);\n  }\n}\n\nasync function scanModels(apiKey) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('AI provider timeout sau '+Math.round(timeoutMs/1000)+' giây');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function scanModels(apiKey) {
   const provider = detectProvider(apiKey);
   if (!provider) throw new Error('Không nhận diện được API key. Hiện hỗ trợ API key OpenAI và OpenRouter.');
   const response = await fetchWithTimeout(provider.base + '/models', { headers: { Authorization: 'Bearer ' + String(apiKey).trim() } });
