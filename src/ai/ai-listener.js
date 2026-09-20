@@ -172,6 +172,10 @@ class AiListener {
     return this.enabled;
   }
 
+  clearLogs() {
+    this.logs = [];
+  }
+
   getStatus() {
     const target = getActiveTarget();
     const settings = loadAiSettings();
