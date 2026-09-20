@@ -85,6 +85,8 @@ Message content and intervals are configuration data, separate from scheduler co
 
 The API key is stored locally in `data/ai.json`, which is ignored by Git. AI settings are not required in `.env`. An API error remains an API error; Ollama is an explicit alternative and is never used automatically as an API fallback.
 
+To use Ollama instead, install/start it from the dashboard, scan or download a model, then select an Ollama model in the Ollama section. Selecting an Ollama model explicitly switches the configured AI provider to Ollama.
+
 AI uses the active account/channel and polls for new messages. When AI starts or the active target changes, existing messages are treated as a baseline and are not answered retroactively.
 
 ### Memory
