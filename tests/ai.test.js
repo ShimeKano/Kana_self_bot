@@ -1,32 +1,50 @@
 const assert = require('assert');
-const { detectProvider, generateReply } = require('../src/ai/ai-provider');
+const { detectProvider, scanModels, scanOllamaModels, generateReply } = require('../src/ai/ai-provider');
 const { AiListener } = require('../src/ai/ai-listener');
+const { getEffectiveAiSettings } = require('../src/ai/ai-settings-store');
 
-console.log('🧪 Chạy kiểm tra AI...');
+async function main() {
+  console.log('🧪 Chạy kiểm tra AI...');
 
-assert.equal(detectProvider('sk-test-key')?.id, 'openai');
-assert.equal(detectProvider('sk-or-v1-test-key')?.id, 'openrouter');
-assert.equal(detectProvider('invalid-key'), null);
+  assert.equal(detectProvider('sk-test-key')?.id, 'openai');
+  assert.equal(detectProvider('sk-or-v1-test-key')?.id, 'openrouter');
+  assert.equal(detectProvider('invalid-key'), null);
 
-const listener = new AiListener();
-assert.equal(listener.enabled, false);
-assert.equal(listener.timer, null);
-assert.equal(listener.getStatus().running, false);
+  const listener = new AiListener();
+  assert.equal(listener.enabled, false);
+  assert.equal(listener.timer, null);
+  assert.equal(listener.getStatus().running, false);
+  listener.stop();
 
-listener.stop();
+  await assert.rejects(
+    generateReply({ providerId: 'openai', apiKey: '', model: 'test-model', message: { content: 'test' } }),
+    /API key/i
+  );
 
-(async()=>{
-  let threw = false;
+  const originalFetch = global.fetch;
   try {
-    await generateReply({
-      providerId: 'openai',
-      apiKey: '',
-      model: 'test-model',
-      message: { content: 'test' }
+    global.fetch = async (url) => ({
+      ok: true,
+      async json() {
+        if (String(url).endsWith('/models')) return { data: [{ id: 'gpt-test' }, { id: 'text-embedding-test' }] };
+        if (String(url).endsWith('/api/tags')) return { models: [{ name: 'qwen3:1.7b' }] };
+        throw new Error('Unexpected URL: ' + url);
+      },
+      async text() { return ''; }
     });
-  } catch (error) {
-    threw = /API key/i.test(error.message);
+    const apiScan = await scanModels('sk-test-key');
+    assert.deepEqual(apiScan.models, ['gpt-test']);
+    const ollamaScan = await scanOllamaModels();
+    assert.deepEqual(ollamaScan.models, ['qwen3:1.7b']);
+  } finally {
+    global.fetch = originalFetch;
   }
-  assert.equal(threw, true);
-  console.log('✅ Provider detection, AI state và API-key validation hợp lệ.');
-})();
+
+  const effective = getEffectiveAiSettings();
+  assert.ok(effective.provider);
+  assert.ok(effective.model);
+
+  console.log('✅ Provider, model scan, settings và listener state hợp lệ.');
+}
+
+main().catch(error => { console.error(error); process.exitCode = 1; });
