@@ -18,10 +18,10 @@ function cleanModels(data) {
     .sort((a, b) => a.localeCompare(b));
 }
 
-async function scanModels(apiKey) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {\n  const controller = new AbortController();\n  const timer = setTimeout(() => controller.abort(), timeoutMs);\n  try {\n    return await fetch(url, { ...options, signal: controller.signal });\n  } catch (error) {\n    if (error?.name === 'AbortError') throw new Error('AI provider timeout sau '+Math.round(timeoutMs/1000)+' giây');\n    throw error;\n  } finally {\n    clearTimeout(timer);\n  }\n}\n\nasync function scanModels(apiKey) {
   const provider = detectProvider(apiKey);
   if (!provider) throw new Error('Không nhận diện được API key. Hiện hỗ trợ API key OpenAI và OpenRouter.');
-  const response = await fetch(provider.base + '/models', { headers: { Authorization: 'Bearer ' + String(apiKey).trim() } });
+  const response = await fetchWithTimeout(provider.base + '/models', { headers: { Authorization: 'Bearer ' + String(apiKey).trim() } });
   if (!response.ok) {
     const body = await response.text().catch(() => '');
     throw new Error(provider.name + ' HTTP ' + response.status + (body ? ': ' + body.slice(0, 180) : ''));
@@ -33,7 +33,7 @@ async function scanModels(apiKey) {
 
 async function scanOllamaModels(base = PROVIDERS.ollama.base) {
   const root = String(base).replace(/\/$/, '');
-  const response = await fetch(root + '/api/tags');
+  const response = await fetchWithTimeout(root + '/api/tags', {}, 10000);
   if (!response.ok) {
     const body = await response.text().catch(() => '');
     throw new Error('Ollama HTTP ' + response.status + (body ? ': ' + body.slice(0, 180) : ''));
@@ -44,16 +44,16 @@ async function scanOllamaModels(base = PROVIDERS.ollama.base) {
 }
 
 async function generateReply({ apiKey, providerId, provider, apiBase, model, message, history = [] }) {
-  const selectedId = providerId || provider || (apiKey ? detectProvider(apiKey)?.id : 'ollama');
+  const selectedId = providerId || provider;
   if (selectedId === 'ollama') return generateOllamaReply({ apiBase, model, message, history });
 
   const selected = PROVIDERS[selectedId];
   if (!selected) throw new Error('AI provider chưa được cấu hình');
-  if (!apiKey) throw new Error('API key không có; hãy nhập API key để dùng provider này hoặc cấu hình Ollama như một lựa chọn thay thế');
+  if (!apiKey) throw new Error('API key không có; hãy nhập API key để dùng provider này');
 
   const base = String(apiBase || selected.base).replace(/\/$/, '');
   const messages = buildMessages(message, history);
-  const response = await fetch(base + '/chat/completions', {
+  const response = await fetchWithTimeout(base + '/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + String(apiKey).trim() },
     body: JSON.stringify({ model, messages, temperature: 0.8, max_tokens: 500 })
@@ -79,7 +79,7 @@ function buildMessages(message, history) {
 async function generateOllamaReply({ apiBase, model, message, history = [] }) {
   const base = String(apiBase || PROVIDERS.ollama.base).replace(/\/$/, '');
   if (!model) throw new Error('Chưa chọn Ollama model');
-  const response = await fetch(base + '/api/chat', {
+  const response = await fetchWithTimeout(base + '/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, messages: buildMessages(message, history), stream: false, options: { temperature: 0.8 } })
