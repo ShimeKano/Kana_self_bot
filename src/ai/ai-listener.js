@@ -20,13 +20,25 @@ class AiListener {
     this.lastError = null;
     this.lastEventAt = null;
     this.repliesSent = 0;
+    this.logs = [];
+  }
+
+  log(level, message, data = null) {
+    const entry = { time: new Date().toISOString(), level, message, ...(data ? { data } : {}) };
+    this.logs.push(entry);
+    if (this.logs.length > 200) this.logs.splice(0, this.logs.length - 200);
+    const line = `[AI][${level}] ${message}${data ? ' ' + JSON.stringify(data) : ''}`;
+    if (level === 'ERROR') console.error(line); else console.log(line);
   }
 
   async poll() {
     if (!this.enabled || this.processing) return;
     const target = getActiveTarget();
     const settings = loadAiSettings();
-    if (!target || !settings.apiKey || !settings.provider || !settings.model) return;
+    if (!target || !settings.apiKey || !settings.provider || !settings.model) {
+      this.log('WARN', 'AI chưa sẵn sàng', { hasTarget: Boolean(target), apiConfigured: Boolean(settings.apiKey), provider: settings.provider || null, model: settings.model || null });
+      return;
+    }
 
     if (this.lastChannelId !== target.channelId || this.lastAccountId !== target.accountId) {
       this.lastChannelId = target.channelId;
@@ -34,6 +46,7 @@ class AiListener {
       this.seenIds.clear();
       this.history = loadMemory(target.accountId, 40);
       this.userId = null;
+      this.log('INFO', 'Đổi AI target', { accountId: target.accountId, channelId: target.channelId });
     }
 
     this.processing = true;
@@ -41,14 +54,17 @@ class AiListener {
       if (!this.userId) {
         const identity = await fetchCurrentUser(target);
         if (!identity.ok) {
+          this.log('ERROR', 'Không lấy được Discord identity', { error: identity.message || identity.error || 'unknown error' });
           this.lastError = 'Discord identity: ' + (identity.message || identity.error || 'unknown error');
           return;
         }
         this.userId = identity.data?.id || null;
+        this.log('INFO', 'Discord identity OK', { userId: this.userId });
       }
 
       const result = await fetchLatestMessages(20, target);
       if (!result.ok) {
+        this.log('ERROR', 'Không đọc được channel messages', { error: result.message || result.error || 'unknown error' });
         this.lastError = 'Discord messages: ' + (result.message || result.error || 'unknown error');
         return;
       }
@@ -73,17 +89,21 @@ class AiListener {
           authorId: message.author?.id || 'user',
           content: String(message.content).trim()
         };
+        this.log('IN', 'Nhận tin nhắn', { messageId: message.id, authorId: normalized.authorId, content: normalized.content });
 
         try {
           const history = this.history.slice(-20);
+          this.log('AI', 'Đang tạo reply', { model: settings.model, historyMessages: history.length, content: normalized.content });
           const reply = await generateReply({
             ...settings,
             message: normalized,
             history
           });
 
+          this.log('OUT', 'AI tạo reply', { content: reply });
           const sent = await sendMessage(reply, target);
           if (!sent.ok) {
+            this.log('ERROR', 'Gửi reply thất bại', { error: sent.message || sent.error || 'unknown error', content: reply });
             this.lastError = 'Discord send: ' + (sent.message || sent.error || 'unknown error');
             continue;
           }
@@ -91,6 +111,7 @@ class AiListener {
           this.lastReplyAt = Date.now();
           this.lastEventAt = new Date().toISOString();
           this.repliesSent += 1;
+          this.log('SENT', 'Đã gửi reply thành công', { content: reply });
           this.lastError = null;
           this.history.push(normalized, { authorId: 'assistant', content: reply });
           this.history = this.history.slice(-40);
@@ -151,7 +172,8 @@ class AiListener {
       memoryMessages: target ? loadMemory(target.accountId, 100000).length : 0,
       lastError: this.lastError,
       lastEventAt: this.lastEventAt,
-      repliesSent: this.repliesSent
+      repliesSent: this.repliesSent,
+      logs: this.logs.slice(-200)
     };
   }
 }
