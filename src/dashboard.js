@@ -5,7 +5,7 @@ const config = require('../config');
 const { aiListener } = require('./ai/ai-listener');
 const { verifyToken, sendMessage } = require('./discord');
 const { scheduler } = require('./automation-core');
-const { scanModels, scanOllamaModels } = require('./ai/ai-provider');
+const { scanModels, scanOllamaModels, generateReply } = require('./ai/ai-provider');
 const ollama = require('./ai/ollama-manager');
 const { loadAiSettings, saveAiSettings, getPublicAiSettings } = require('./ai/ai-settings-store');
 const { loadMemory, clearMemory } = require('./memory-store');
@@ -24,6 +24,7 @@ app.post('/api/ollama/remove',async(req,res)=>{try{const result=await ollama.rem
 app.post('/api/ollama/scan',async(req,res)=>{try{const result=await scanOllamaModels();const s=loadAiSettings();const selected=s.ollamaModel&&result.models.includes(s.ollamaModel)?s.ollamaModel:(result.models[0]||ollama.DEFAULT_MODEL);saveAiSettings({ollamaModel:selected});res.json({ok:true,models:result.models,selectedModel:selected,ollama:await ollama.status()})}catch(e){res.status(400).json({ok:false,error:e.message})}});
 app.post('/api/ai/model', (req,res)=>{try{const model=String(req.body?.model||'').trim(),s=loadAiSettings();if(!model||!s.models.includes(model))return res.status(400).json({ok:false,error:'Model không nằm trong danh sách đã scan'});saveAiSettings({model});res.json({ok:true,ai:getPublicAiSettings()});}catch(e){res.status(400).json({ok:false,error:e.message})}});
 app.post('/api/ollama/model',(req,res)=>{try{const model=String(req.body?.model||'').trim();if(!model)throw new Error('Chưa chọn Ollama model');saveAiSettings({ollamaModel:model});res.json({ok:true,ai:getPublicAiSettings()})}catch(e){res.status(400).json({ok:false,error:e.message})}});
+app.post('/api/ai/test',async(req,res)=>{try{const s=require('./ai/ai-settings-store').getEffectiveAiSettings();if(!s.model)throw new Error('Chưa chọn model AI');const message={content:String(req.body?.message||'Xin chào! Hãy trả lời ngắn gọn để kiểm tra AI.'),authorId:'test-user'};const started=Date.now();const reply=await generateReply({...s,providerId:s.provider,message,history:[]});res.json({ok:true,provider:s.provider,model:s.model,reply,latencyMs:Date.now()-started})}catch(e){let alternative=null;try{const o=await ollama.status();alternative={available:o.installed&&o.running&&o.models.length>0,installed:o.installed,running:o.running,models:o.models}}catch{}aiListener.log('ERROR','AI test failed',{error:e.message});res.status(400).json({ok:false,error:e.message,alternative})}});
 app.post('/api/ai/toggle',async(req,res)=>{try{const enabled=Boolean(req.body?.enabled);await aiListener.setEnabled(enabled);saveAiSettings({enabled});if(enabled)scheduler.stopCustomTimers();else scheduler.sync();res.json({ok:true,ai:{...aiListener.getStatus(),settings:getPublicAiSettings()},scheduler:scheduler.getStatus()});}catch(e){res.status(400).json({ok:false,error:e.message})}});
 app.get('/api/ai/memory/:accountId',(req,res)=>{try{res.json({ok:true,accountId:req.params.accountId,messages:loadMemory(req.params.accountId,100000)});}catch(e){res.status(400).json({ok:false,error:e.message})}});
 app.delete('/api/ai/memory/:accountId',(req,res)=>{try{clearMemory(req.params.accountId);res.json({ok:true});}catch(e){res.status(400).json({ok:false,error:e.message})}});
